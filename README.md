@@ -1,117 +1,52 @@
-# Postcode IO Gateway
+# Postcode.io Gateway
 
-A Spring Boot gateway service for the UK postcodes.io API, providing location-based functionality for job seeker applications.
+Spring Boot boundary for postcode/outcode lookup. LIVE mode calls
+`api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
+test data.
 
-## Features
+> Beta status: not beta-ready. Fixture mode has an unapproved generated binary
+> dependency and live-provider resilience/error mapping is incomplete. See
+> [the audit](docs/BETA_READINESS_AUDIT.md).
 
-- **Postcode Lookup**: Retrieve location data (latitude, longitude, region, etc.) for UK postcodes
-- **Outcode Lookup**: Query postcode outcodes for geographic information
-- **Spring Boot 3.2**: Built on the latest Spring Boot framework with Java 17
-- **WebFlux Support**: Reactive programming model for improved performance
-- **Actuator Endpoints**: Health checks and monitoring capabilities
-- **Docker Ready**: Containerized deployment support
+## Requirements and configuration
 
-## Tech Stack
+- Java 17 and Maven 3.9
 
-- **Java 17**
-- **Spring Boot 3.2.0**
-- **Spring WebFlux** (reactive web framework)
-- **Spring Boot Actuator** (monitoring)
-- **Lombok** (boilerplate reduction)
-- **Maven** (build tool)
-- **Docker** (containerization)
+| Variable | Local default | Purpose |
+|---|---|---|
+| `SERVER_PORT` | `8082` | HTTP port |
+| `EXTERNAL_PROVIDER_MODE` | `LIVE` | `LIVE` or `FIXTURE` |
+| `SYSTEM_DATA_SERVICE_URL` | `http://localhost:8103` | Fixture dependency |
+| `FIXTURE_DATASET_ID` / `FIXTURE_DATASET_VERSION` / `FIXTURE_SCENARIO` | demo values | Deterministic fixture selection |
 
-## Project Structure
+No provider credential is currently required by postcodes.io. Do not add one
+to source.
 
-```
-src/main/java/com/jobseekercopilot/postcodeiogateway/
-├── PostcodeIoGatewayApplication.java  # Application entry point
-├── client/
-│   └── PostcodeIoApiClient.java       # HTTP client for postcodes.io API
-├── controller/
-│   └── PostcodeController.java        # REST API endpoints
-├── model/
-│   └── PostcodeLocation.java          # Data models
-└── service/
-    └── PostcodeService.java           # Business logic layer
+## API, health and build
 
-src/test/java/com/jobseekercopilot/postcodeiogateway/
-├── PostcodeControllerIntegrationTest.java
-└── service/
-    └── PostcodeServiceTest.java
-```
-
-## Getting Started
-
-### Prerequisites
-
-- Java 17+
-- Maven 3.8+
-- Docker (optional, for containerized deployment)
-
-### Building the Application
+- `GET /api/postcodes/{postcode}`
+- `GET /internal/provider-mode`
+- `/v3/api-docs`, `/swagger-ui/index.html`, `/actuator/health`
 
 ```bash
-mvn clean install
-```
-
-### Running the Application
-
-```bash
+mvn -B verify
 mvn spring-boot:run
-```
-
-The application will start on `http://localhost:8080`
-
-### Running with Docker
-
-```bash
 docker build -t postcode-io-gateway .
-docker run -p 8080:8080 postcode-io-gateway
 ```
 
-## API Endpoints
+The clean build fails until POSTCODE-01 removes the local system-data client
+JAR. Do not create an additional repository without approval.
 
-### Health Check
-```
-GET /actuator/health
-```
+## Branch workflow and troubleshooting
 
-### Postcode Lookup
-```
-GET /api/postcodes/{postcode}
-```
-Returns location data for a given UK postcode.
+Use `feature/* → develop`; `main` will be introduced later. Confirm the active
+provider mode before diagnosing lookups. Production must never use fixture mode
+and tests should not make uncontrolled live calls.
 
-### Outcode Lookup
-```
-GET /api/outcodes/{outcode}
-```
-Returns geographic information for a given outcode.
+## Licence
 
-## Configuration
+Copyright © 2026 Bernard McGeever. All rights reserved.
 
-Key configuration properties in `src/main/resources/application.properties`:
-
-- `server.port`: Application port (default: 8080)
-- Postcodes.io API base URL configuration
-
-## Testing
-
-Run the test suite:
-
-```bash
-mvn test
-```
-
-## License
-
-This project is part of the Job Seeker Copilot ecosystem.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+This repository contains proprietary software belonging to Bernard McGeever.
+It may not be used, copied, modified or distributed without express written
+permission. See [LICENSE](./LICENSE).
