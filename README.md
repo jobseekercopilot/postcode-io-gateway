@@ -4,9 +4,9 @@ Spring Boot boundary for postcode/outcode lookup. LIVE mode calls
 `api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
 test data.
 
-> Beta status: not beta-ready. The fixture client is now an in-repository HTTP
-> boundary, but live-provider resilience/error mapping is incomplete. See
-> [the audit](docs/BETA_READINESS_AUDIT.md).
+> Beta status: not beta-ready. The fixture client is an in-repository HTTP
+> boundary and live calls are bounded, but public error mapping is incomplete.
+> See [the audit](docs/BETA_READINESS_AUDIT.md).
 
 ## Requirements and configuration
 
@@ -17,6 +17,12 @@ test data.
 | `SERVER_PORT` | `8082` | HTTP port |
 | `DEPLOYMENT_ENVIRONMENT_CLASS` | none (required) | `LOCAL`, `TEST`, `DEMO`, `STAGING`, or `PRODUCTION` |
 | `EXTERNAL_PROVIDER_MODE` | none (required) | `LIVE` or `FIXTURE`; must match the environment-class policy |
+| `EXTERNAL_PROVIDER_BASE_URL` | `https://api.postcodes.io` | Trusted LIVE provider origin; override only for an approved local test stub |
+| `PROVIDER_CONNECT_TIMEOUT` / `PROVIDER_RESPONSE_TIMEOUT` / `PROVIDER_TOTAL_TIMEOUT` | `500ms` / `1s` / `4s` | Per-connect, per-attempt and hard logical-call deadlines |
+| `PROVIDER_MAX_RETRIES` / `PROVIDER_INITIAL_BACKOFF` / `PROVIDER_MAX_BACKOFF` / `PROVIDER_RETRY_JITTER` | `2` / `100ms` / `500ms` / `0.5` | Bounded transient-failure retry policy |
+| `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` / `PROVIDER_CIRCUIT_OPEN_DURATION` | `5` / `30s` | Consecutive logical failures before open and half-open delay |
+| `PROVIDER_SUCCESS_CACHE_TTL` / `PROVIDER_NEGATIVE_CACHE_TTL` / `PROVIDER_CACHE_MAXIMUM_ENTRIES` | `15m` / `1m` / `1000` | Bounded per-instance positive/404 cache |
+| `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` | `health,info` | Actuator web endpoints; expose `metrics` only on an approved operational network |
 | `PROVIDER_MODE_ENDPOINT_ENABLED` | `false` | Opt in to `/internal/provider-mode`; forbidden in `STAGING`/`PRODUCTION` |
 | `SYSTEM_DATA_SERVICE_URL` | `http://localhost:8103` | Fixture dependency |
 | `FIXTURE_DATASET_ID` / `FIXTURE_DATASET_VERSION` / `FIXTURE_SCENARIO` | demo values | Fixture safety metadata exposed by the existing internal mode endpoint |
@@ -51,6 +57,12 @@ Startup fails when either environment class or provider mode is missing, blank,
 unknown, or unsafe. See the [provider-mode safety policy](docs/PROVIDER_MODE_SECURITY.md)
 for the allowed matrix, Compose examples, diagnostics restriction, and rollout
 requirements.
+
+LIVE lookups have explicit deadlines, safe jittered retries, a circuit breaker,
+separate positive/negative cache TTLs and bounded-cardinality metrics. See the
+[provider resilience policy](docs/PROVIDER_RESILIENCE.md) for the retryable
+failure set, request budget, metrics, alert starting points, ownership and
+residual risks.
 
 ## Branch workflow and troubleshooting
 
