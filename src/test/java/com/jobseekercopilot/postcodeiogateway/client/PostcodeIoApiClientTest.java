@@ -8,6 +8,7 @@ import com.jobseekercopilot.postcodeiogateway.config.ProviderResiliencePropertie
 import com.jobseekercopilot.postcodeiogateway.model.PostcodeLocation;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,8 +24,68 @@ import reactor.core.publisher.Mono;
 
 class PostcodeIoApiClientTest {
     private static final String SUCCESS_BODY = """
-            {"result":{"postcode":"LS1 1UR","country":"England","region":"Yorkshire and The Humber"}}
+            {"status":200,"result":{"postcode":"LS1 1UR","country":"England","region":"Yorkshire and The Humber"}}
             """;
+    private static final String OUTCODE_SUCCESS_BODY = """
+            {"status":200,"result":{"outcode":"LS1","country":["England"],"region":["Yorkshire and The Humber"],"future_field":"ignored"},"future_envelope_field":true}
+            """;
+
+    @Test
+    void buildsProviderPathsFromIsolatedEncodedSegments() {
+        AtomicReference<String> rawPath = new AtomicReference<>();
+        PostcodeIoApiClient client = client(request -> {
+            rawPath.set(request.url().getRawPath());
+            return response(HttpStatus.OK, SUCCESS_BODY);
+        }, properties(), new SimpleMeterRegistry(), new AtomicLong());
+
+        assertThat(client.fetchPostcodeDetails("LS1 1UR").block()).isNotNull();
+
+        assertThat(rawPath).hasValue("/postcodes/LS11UR");
+    }
+
+    @Test
+    void consumesTheDocumentedOutcodeFixtureAndIgnoresAdditiveFields() {
+        AtomicReference<String> rawPath = new AtomicReference<>();
+        PostcodeIoApiClient client = client(request -> {
+            rawPath.set(request.url().getRawPath());
+            return response(HttpStatus.OK, OUTCODE_SUCCESS_BODY);
+        }, properties(), new SimpleMeterRegistry(), new AtomicLong());
+
+        PostcodeLocation result = client.fetchPostcodeDetails("LS1").block();
+
+        assertThat(result).isNotNull();
+        assertThat(result.getPostcode()).isEqualTo("LS1");
+        assertThat(result.getCountry()).isEqualTo("England");
+        assertThat(rawPath).hasValue("/outcodes/LS1");
+    }
+
+    @Test
+    void rejectsAndSignalsProviderSchemaDrift() {
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        PostcodeIoApiClient client = client(request -> response(HttpStatus.OK,
+                "{\"status\":200,\"result\":{\"renamed_postcode\":\"LS1 1UR\"}}"),
+                properties(), meters, new AtomicLong());
+
+        assertThatThrownBy(() -> client.fetchPostcodeDetails("LS1 1UR").block())
+                .isInstanceOf(ProviderResponseException.class);
+        assertThat(meters.get("postcode.provider.compatibility.failures").counter().count())
+                .isEqualTo(3);
+    }
+
+    @Test
+    void rejectsAProviderResultForADifferentPostcode() {
+        ProviderResilienceProperties properties = properties();
+        properties.setMaxRetries(0);
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        PostcodeIoApiClient client = client(request -> response(HttpStatus.OK,
+                "{\"status\":200,\"result\":{\"postcode\":\"SW1A 1AA\"}}"),
+                properties, meters, new AtomicLong());
+
+        assertThatThrownBy(() -> client.fetchPostcodeDetails("LS1 1UR").block())
+                .isInstanceOf(ProviderResponseException.class);
+        assertThat(meters.get("postcode.provider.compatibility.failures").counter().count())
+                .isEqualTo(1);
+    }
 
     @Test
     void retriesRateLimitResponsesWithinTheConfiguredBound() {
@@ -75,7 +136,7 @@ class PostcodeIoApiClientTest {
         PostcodeIoApiClient client = client(request -> {
             calls.incrementAndGet();
             return healthy.get()
-                    ? response(HttpStatus.OK, SUCCESS_BODY)
+                    ? response(HttpStatus.OK, successBody("LS4 4UR"))
                     : response(HttpStatus.SERVICE_UNAVAILABLE, "{}");
         }, properties, meters, nanoTime);
 
@@ -168,7 +229,10 @@ class PostcodeIoApiClientTest {
         properties.setCacheMaximumEntries(1);
         PostcodeIoApiClient client = client(request -> {
             calls.incrementAndGet();
-            return response(HttpStatus.OK, SUCCESS_BODY);
+            String compactPostcode = request.url().getPath().substring("/postcodes/".length());
+            String postcode = compactPostcode.substring(0, compactPostcode.length() - 3)
+                    + " " + compactPostcode.substring(compactPostcode.length() - 3);
+            return response(HttpStatus.OK, successBody(postcode));
         }, properties, new SimpleMeterRegistry(), new AtomicLong());
 
         assertThat(client.fetchPostcodeDetails("LS1 1UR").block()).isNotNull();
@@ -212,5 +276,9 @@ class PostcodeIoApiClientTest {
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(body)
                 .build());
+    }
+
+    private static String successBody(String postcode) {
+        return "{\"status\":200,\"result\":{\"postcode\":\"" + postcode + "\"}}";
     }
 }
