@@ -9,4 +9,6 @@ public interface PostcodeProviderClient {
     Mono<PostcodeLocation> fetchPostcodeDetails(String postcode);
 
     Mono<List<PlaceLocation>> searchPlaces(String query, int limit);
+
+    boolean isReady();
 }

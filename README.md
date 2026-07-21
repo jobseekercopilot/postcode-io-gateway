@@ -37,13 +37,21 @@ to source.
 - `GET /api/places?q={place-name}&limit={1..10}` (LIVE mode)
 - `GET /internal/provider-mode` (only when explicitly enabled in a local/test/demo environment)
 - `/v3/api-docs`, `/swagger-ui/index.html`, `/actuator/health`
+- `/actuator/health/readiness` (aggregate application and provider-circuit readiness)
 
 ```bash
 mvn -B clean verify
 ./scripts/test-dependency-report-policy.sh
+./scripts/verify-container.sh
 DEPLOYMENT_ENVIRONMENT_CLASS=LOCAL EXTERNAL_PROVIDER_MODE=FIXTURE mvn spring-boot:run
-docker build -t postcode-io-gateway .
 ```
+
+The release-shaped container workflow runs the complete verification before
+building from the verified JAR. The digest-pinned image runs read-only as fixed
+UID/GID `10001:10001`, exposes a redacted readiness check, supports graceful
+shutdown and is scanned for Critical/High OS and library findings in CI. See
+[service operations](docs/OPERATIONS.md) and the
+[observability contract](docs/OBSERVABILITY.md).
 
 CI scans the resolved runtime dependency set with pinned Trivy releases,
 publishes the JSON report, and rejects unaccepted Critical or High findings.
@@ -86,7 +94,7 @@ residual risk.
 
 ## Branch workflow and troubleshooting
 
-Use `feature/* → develop`; `main` will be introduced later. Confirm the active
+Use `feature/* → develop`; `main` is not used for application delivery. Confirm the active
 provider mode before diagnosing lookups. Production must never use fixture mode
 and tests should not make uncontrolled live calls.
 

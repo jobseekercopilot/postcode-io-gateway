@@ -21,6 +21,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -93,6 +94,12 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> fixtureProviderFailure(RestClientException error, HttpServletRequest request) {
         return response(HttpStatus.BAD_GATEWAY, "PROVIDER_BAD_RESPONSE",
                 "The postcode provider could not complete the request.", error, request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ResponseEntity<ApiError> missingResource(NoResourceFoundException error, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "NOT_FOUND",
+                "The requested resource was not found.", error, request);
     }
 
     @ExceptionHandler(Exception.class)
