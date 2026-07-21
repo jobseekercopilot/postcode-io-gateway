@@ -2,8 +2,9 @@
 
 Audit date: 18 July 2026
 
-Status: **Not beta-ready.** POSTCODE-01 and POSTCODE-08 are remediated: the
-service builds without a local generated binary and CI now blocks unaccepted
+Status: **Not beta-ready.** POSTCODE-01, POSTCODE-05 and POSTCODE-08 are
+remediated: the service builds without a local generated binary, provider mode
+fails closed against an explicit environment class, and CI blocks unaccepted
 Critical/High runtime dependency findings. Live-provider resilience/error
 handling and the other findings below remain incomplete.
 
@@ -15,7 +16,7 @@ handling and the other findings below remain incomplete.
 | [POSTCODE-02](https://github.com/jobseekercopilot/postcode-io-gateway/issues/2) | Add provider timeout, retry, circuit and cache policy | `PostcodeIoApiClient` creates a default WebClient and calls `retrieve()` with no deadline/backoff/circuit/cache. | **High / P1 reliability:** provider latency/outage can consume resources and cascade. | Set deadlines, bounded jittered retry for safe failures, circuit break, cache/negative-cache and metrics; test outage/429/timeout/recovery. | Provider SLO and monitoring. | Yes | L |
 | [POSTCODE-03](https://github.com/jobseekercopilot/postcode-io-gateway/issues/3) | Validate requests and preserve meaningful status codes | `postcode.replaceAll` assumes non-null; no postcode format/length validation; controller converts every error to empty 500. | **High / P1 API:** invalid/not-found/rate-limit/outage are indistinguishable and clients cannot recover correctly. | Canonicalise with a documented validator; map 400/404/429/502/503/504 to stable redacted errors; test full/outcode/invalid/empty/partial. | Location error contract. | Yes | M |
 | [POSTCODE-04](https://github.com/jobseekercopilot/postcode-io-gateway/issues/4) | Build provider URIs safely and monitor API compatibility | Paths are concatenated strings and response DTOs assume current provider shapes; no compatibility alert/test exists. | **Medium / P2 reliability/security:** unexpected encoded input or provider schema change causes failures. | Use URI builder/path segments, validate before construction, pin/document provider version assumptions and run contract fixtures. | POSTCODE-03. | No | S |
-| [POSTCODE-05](https://github.com/jobseekercopilot/postcode-io-gateway/issues/5) | Fail closed for fixture/live mode | LIVE is default; fixture is rejected only when profile is exactly `prod`/`production`; provider-mode endpoint reveals mode. | **High / P1 configuration:** a misnamed environment can run fixture data in production or make live calls in tests. | Require explicit mode, validate an explicit environment class, restrict internal endpoint, fail startup on ambiguity and test prod-like configurations. | Deployment config convention. | Yes | M |
+| [POSTCODE-05](https://github.com/jobseekercopilot/postcode-io-gateway/issues/5) | Fail closed for fixture/live mode | **Remediated:** provider mode and environment class are explicit; a startup policy enforces safe combinations; diagnostics are opt-in and forbidden in production-like classes. | The High configuration risk is resolved; deployment manifests must continue to set both explicit values. | Retain the documented matrix, startup/context tests and restricted diagnostics default. | Repository-owned convention in `docs/PROVIDER_MODE_SECURITY.md`. | No | M |
 | [POSTCODE-06](https://github.com/jobseekercopilot/postcode-io-gateway/issues/6) | Expand provider and security testing | Eight tests cover controller/service behaviour and fixture HTTP mapping/encoding/failure; no real LIVE-provider stub, timeout, 429, malformed payload, cache, mode-safety or correlation propagation test exists. | **High / P1 testing:** live-provider boundary failure modes remain unproven. | Add WireMock-equivalent integration/contract tests and include full location/browser journey. | POSTCODE-02–05. | Yes | M |
 | [POSTCODE-07](https://github.com/jobseekercopilot/postcode-io-gateway/issues/7) | Harden container, health, telemetry and docs | Docker skips tests and runs root/mutable tags; health has no provider readiness; README is skeletal. | **Medium / P1 operational/docs:** no deployable/diagnosable beta baseline. | Pin/non-root/scan image, run verify, expose safe readiness, metrics/alerts/graceful shutdown and complete operational/proprietary docs. | POSTCODE-01/02. | Yes | M |
 | [POSTCODE-08](https://github.com/jobseekercopilot/postcode-io-gateway/issues/8) | Establish reliable dependency vulnerability scanning | **Remediated:** CI scans Maven's resolved runtime libraries with pinned Trivy/action revisions, retains JSON evidence and applies a tested fail-closed policy. | The High dependency-gate risk is resolved; one Medium finding remains outside the Critical/High gate and advisory lag remains residual risk. | Keep scanner/action versions pinned and current; review reports and remove expired exceptions; retain policy negative tests. | Shared platform policy is documented in `docs/DEPENDENCY_SECURITY.md`. | No | M |
@@ -48,5 +49,22 @@ handling and the other findings below remain incomplete.
   missing, invalid or expired risk-exception metadata. Full details are in
   `docs/DEPENDENCY_SECURITY.md`.
 
-This resolves POSTCODE-01 and POSTCODE-08 only. POSTCODE-02 through POSTCODE-07
-remain open, so the service is still **not beta-ready**.
+At completion of POSTCODE-08, POSTCODE-01 and POSTCODE-08 were resolved while
+POSTCODE-02 through POSTCODE-07 remained open.
+
+## POSTCODE-05 remediation evidence
+
+- `EXTERNAL_PROVIDER_MODE` no longer defaults to LIVE and
+  `DEPLOYMENT_ENVIRONMENT_CLASS` has no default; missing, blank or unknown values
+  fail configuration/startup.
+- The documented matrix allows either mode only for explicit LOCAL use, requires
+  FIXTURE for TEST/DEMO, and requires LIVE for STAGING/PRODUCTION.
+- The internal provider-mode endpoint is absent by default, requires an explicit
+  opt-in, and cannot be enabled in STAGING/PRODUCTION.
+- Focused tests cover the allowed matrix, missing configuration, test-like live
+  calls, production-like fixture use, production diagnostics, context startup,
+  and endpoint opt-in.
+
+This resolves POSTCODE-01, POSTCODE-05 and POSTCODE-08 only. POSTCODE-02 through
+POSTCODE-04, POSTCODE-06 and POSTCODE-07 remain open, so the service is still
+**not beta-ready**.

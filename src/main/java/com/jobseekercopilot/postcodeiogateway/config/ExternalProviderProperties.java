@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "external-provider")
 public class ExternalProviderProperties {
-    private ExternalProviderMode mode = ExternalProviderMode.LIVE;
+    private ExternalProviderMode mode;
 
     public ExternalProviderMode getMode() {
         return mode;
