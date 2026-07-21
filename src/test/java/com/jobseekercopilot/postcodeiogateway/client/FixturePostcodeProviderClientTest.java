@@ -79,6 +79,17 @@ class FixturePostcodeProviderClientTest {
     }
 
     @Test
+    void rejectsFixturesThatExplicitlyReportNoMatch() {
+        server.expect(once(), requestTo("http://fixture.test/internal/fixtures/postcodes/LS1"))
+                .andRespond(withSuccess("""
+                        {"postcode":"LS1","found":false}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThrows(ProviderNotFoundException.class,
+                () -> client.fetchPostcodeDetails("LS1").block());
+    }
+
+    @Test
     void keepsQueryTextInsideTheEncodedPostcodePathSegment() {
         server.expect(once(), request -> {
                     assertEquals("/internal/fixtures/postcodes/LS1%201UR%3Fadmin=true",

@@ -5,7 +5,8 @@ Spring Boot boundary for postcode/outcode lookup. LIVE mode calls
 test data.
 
 > Beta status: not beta-ready. The fixture client is an in-repository HTTP
-> boundary and live calls are bounded, but public error mapping is incomplete.
+> boundary and live calls are bounded, but provider compatibility and full
+> consumer-journey coverage remain incomplete.
 > See [the audit](docs/BETA_READINESS_AUDIT.md).
 
 ## Requirements and configuration
@@ -63,6 +64,12 @@ separate positive/negative cache TTLs and bounded-cardinality metrics. See the
 [provider resilience policy](docs/PROVIDER_RESILIENCE.md) for the retryable
 failure set, request budget, metrics, alert starting points, ownership and
 residual risks.
+
+Requests accept syntactically valid UK full postcodes and outcodes, canonicalise
+them before provider access, and expose stable redacted `400`, `404`, `429`,
+`502`, `503`, and `504` error responses. See the
+[public postcode API contract](docs/POSTCODE_API_CONTRACT.md) for accepted
+forms, error codes, correlation-ID rules, and consumer ownership.
 
 ## Branch workflow and troubleshooting
 
