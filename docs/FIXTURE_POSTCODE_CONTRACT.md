@@ -6,7 +6,8 @@ generated system-data client, a local JAR or an external contract package.
 
 ## Request
 
-When `EXTERNAL_PROVIDER_MODE=FIXTURE`, the gateway sends:
+When `DEPLOYMENT_ENVIRONMENT_CLASS` and `EXTERNAL_PROVIDER_MODE=FIXTURE` satisfy
+the [provider-mode safety policy](PROVIDER_MODE_SECURITY.md), the gateway sends:
 
 ```text
 GET {SYSTEM_DATA_SERVICE_URL}/internal/fixtures/postcodes/{postcode}

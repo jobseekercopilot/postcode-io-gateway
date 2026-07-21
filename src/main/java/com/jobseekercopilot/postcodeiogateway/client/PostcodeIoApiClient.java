@@ -18,7 +18,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 @Component
-@ConditionalOnProperty(prefix = "external-provider", name = "mode", havingValue = "LIVE", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "external-provider", name = "mode", havingValue = "LIVE")
 public class PostcodeIoApiClient implements PostcodeProviderClient {
 
     private static final Logger log = LoggerFactory.getLogger(PostcodeIoApiClient.class);

@@ -15,7 +15,9 @@ test data.
 | Variable | Local default | Purpose |
 |---|---|---|
 | `SERVER_PORT` | `8082` | HTTP port |
-| `EXTERNAL_PROVIDER_MODE` | `LIVE` | `LIVE` or `FIXTURE` |
+| `DEPLOYMENT_ENVIRONMENT_CLASS` | none (required) | `LOCAL`, `TEST`, `DEMO`, `STAGING`, or `PRODUCTION` |
+| `EXTERNAL_PROVIDER_MODE` | none (required) | `LIVE` or `FIXTURE`; must match the environment-class policy |
+| `PROVIDER_MODE_ENDPOINT_ENABLED` | `false` | Opt in to `/internal/provider-mode`; forbidden in `STAGING`/`PRODUCTION` |
 | `SYSTEM_DATA_SERVICE_URL` | `http://localhost:8103` | Fixture dependency |
 | `FIXTURE_DATASET_ID` / `FIXTURE_DATASET_VERSION` / `FIXTURE_SCENARIO` | demo values | Fixture safety metadata exposed by the existing internal mode endpoint |
 
@@ -25,13 +27,13 @@ to source.
 ## API, health and build
 
 - `GET /api/postcodes/{postcode}`
-- `GET /internal/provider-mode`
+- `GET /internal/provider-mode` (only when explicitly enabled in a local/test/demo environment)
 - `/v3/api-docs`, `/swagger-ui/index.html`, `/actuator/health`
 
 ```bash
 mvn -B clean verify
 ./scripts/test-dependency-report-policy.sh
-mvn spring-boot:run
+DEPLOYMENT_ENVIRONMENT_CLASS=LOCAL EXTERNAL_PROVIDER_MODE=FIXTURE mvn spring-boot:run
 docker build -t postcode-io-gateway .
 ```
 
@@ -44,6 +46,11 @@ The build has no local JAR dependency and succeeds from a clean clone. FIXTURE
 mode uses the small HTTP contract documented in
 [`docs/FIXTURE_POSTCODE_CONTRACT.md`](docs/FIXTURE_POSTCODE_CONTRACT.md); do not
 restore generated binaries or create another repository for it.
+
+Startup fails when either environment class or provider mode is missing, blank,
+unknown, or unsafe. See the [provider-mode safety policy](docs/PROVIDER_MODE_SECURITY.md)
+for the allowed matrix, Compose examples, diagnostics restriction, and rollout
+requirements.
 
 ## Branch workflow and troubleshooting
 
