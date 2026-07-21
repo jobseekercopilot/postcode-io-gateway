@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jobseekercopilot.postcodeiogateway.config.ExternalProviderProperties;
 import com.jobseekercopilot.postcodeiogateway.config.ProviderResilienceProperties;
 import com.jobseekercopilot.postcodeiogateway.logging.CorrelationIdFilter;
+import com.jobseekercopilot.postcodeiogateway.model.PlaceLocation;
 import com.jobseekercopilot.postcodeiogateway.model.PostcodeLocation;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -13,6 +14,7 @@ import io.micrometer.core.instrument.Timer;
 import io.netty.channel.ChannelOption;
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeoutException;
@@ -160,6 +162,106 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
         });
     }
 
+    @Override
+    public Mono<List<PlaceLocation>> searchPlaces(String query, int limit) {
+        return Mono.defer(() -> {
+            if (!circuitBreaker.tryAcquirePermission()) {
+                recordOutcome("circuit_open", -1);
+                return Mono.error(new ProviderCircuitOpenException());
+            }
+
+            long startedAt = nanoTime.getAsLong();
+            log.info("postcodes.io place search started queryPresent={}",
+                    query != null && !query.isBlank());
+
+            Mono<List<PlaceLocation>> request = placeSearchRequest(query, limit)
+                    .timeout(properties.getResponseTimeout());
+            if (properties.getMaxRetries() > 0) {
+                request = request.retryWhen(Retry.backoff(
+                                properties.getMaxRetries(), properties.getInitialBackoff())
+                        .maxBackoff(properties.getMaxBackoff())
+                        .jitter(properties.getJitter())
+                        .filter(this::isRetryable)
+                        .doBeforeRetry(signal -> retryCounter.increment())
+                        .onRetryExhaustedThrow((spec, signal) -> signal.failure()));
+            }
+
+            return request.timeout(properties.getTotalTimeout())
+                    .doOnSuccess(locations -> {
+                        circuitBreaker.recordSuccess();
+                        recordOutcome("success", startedAt);
+                        log.info("postcodes.io place search completed resultCount={} durationMs={}",
+                                locations.size(), elapsedMillis(startedAt));
+                    })
+                    .doOnError(error -> {
+                        Throwable unwrapped = Exceptions.unwrap(error);
+                        if (isCircuitFailure(unwrapped) && circuitBreaker.recordFailure()) {
+                            circuitOpenCounter.increment();
+                        }
+                        recordOutcome("failure", startedAt);
+                        log.warn("postcodes.io place search failed durationMs={} error={}",
+                                elapsedMillis(startedAt), unwrapped.getClass().getSimpleName());
+                    });
+        });
+    }
+
+    private Mono<List<PlaceLocation>> placeSearchRequest(String query, int limit) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder.pathSegment("places")
+                        .queryParam("q", query)
+                        .queryParam("limit", limit)
+                        .build())
+                .retrieve()
+                .bodyToMono(PlaceResponse.class)
+                .switchIfEmpty(Mono.error(new ProviderResponseException()))
+                .flatMap(response -> compatiblePlaceResponse(response, limit));
+    }
+
+    private Mono<List<PlaceLocation>> compatiblePlaceResponse(PlaceResponse response, int limit) {
+        if (response.getStatus() == null
+                || response.getStatus() != 200
+                || response.getResult() == null
+                || response.getResult().size() > limit) {
+            return incompatibleProviderResponse();
+        }
+        List<PlaceLocation> locations = new ArrayList<>();
+        for (PlaceResult result : response.getResult()) {
+            if (result == null
+                    || !boundedText(result.getCode(), 128)
+                    || !boundedText(result.getName(), 200)
+                    || !boundedText(result.getOutcode(), 8)
+                    || !boundedText(result.getRegion(), 100)
+                    || (StringUtils.hasText(result.getDistrictBorough())
+                        && !boundedText(result.getDistrictBorough(), 200))
+                    || (StringUtils.hasText(result.getCountyUnitary())
+                        && !boundedText(result.getCountyUnitary(), 200))
+                    || !boundedCoordinate(result.getLatitude(), -90, 90)
+                    || !boundedCoordinate(result.getLongitude(), -180, 180)) {
+                return incompatibleProviderResponse();
+            }
+            String adminDistrict = StringUtils.hasText(result.getDistrictBorough())
+                    ? result.getDistrictBorough()
+                    : result.getCountyUnitary();
+            locations.add(new PlaceLocation(
+                    result.getCode(),
+                    result.getName(),
+                    result.getOutcode(),
+                    result.getRegion(),
+                    adminDistrict,
+                    result.getLatitude(),
+                    result.getLongitude()));
+        }
+        return Mono.just(List.copyOf(locations));
+    }
+
+    private static boolean boundedText(String value, int maximumLength) {
+        return StringUtils.hasText(value) && value.length() <= maximumLength;
+    }
+
+    private static boolean boundedCoordinate(Double value, double minimum, double maximum) {
+        return value != null && Double.isFinite(value) && value >= minimum && value <= maximum;
+    }
+
     private Mono<PostcodeLocation> providerRequest(String clean, boolean outcode) {
         if (outcode) {
             return webClient.get()
@@ -203,7 +305,7 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
         return Mono.just(toLocation(response.getResult()));
     }
 
-    private Mono<PostcodeLocation> incompatibleProviderResponse() {
+    private <T> Mono<T> incompatibleProviderResponse() {
         compatibilityFailureCounter.increment();
         return Mono.error(new ProviderResponseException());
     }
@@ -341,5 +443,30 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
         @JsonProperty("admin_district")
         private List<String> adminDistrict;
         private List<String> country;
+    }
+
+    @Getter
+    @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class PlaceResponse {
+        private Integer status;
+        private List<PlaceResult> result;
+    }
+
+    @Getter
+    @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class PlaceResult {
+        private String code;
+        @JsonProperty("name_1")
+        private String name;
+        private String outcode;
+        private String region;
+        @JsonProperty("district_borough")
+        private String districtBorough;
+        @JsonProperty("county_unitary")
+        private String countyUnitary;
+        private Double latitude;
+        private Double longitude;
     }
 }

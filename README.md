@@ -1,6 +1,6 @@
 # Postcode.io Gateway
 
-Spring Boot boundary for postcode/outcode lookup. LIVE mode calls
+Spring Boot boundary for postcode/outcode lookup and bounded place-name search. LIVE mode calls
 `api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
 test data.
 
@@ -34,6 +34,7 @@ to source.
 ## API, health and build
 
 - `GET /api/postcodes/{postcode}`
+- `GET /api/places?q={place-name}&limit={1..10}` (LIVE mode)
 - `GET /internal/provider-mode` (only when explicitly enabled in a local/test/demo environment)
 - `/v3/api-docs`, `/swagger-ui/index.html`, `/actuator/health`
 
@@ -70,6 +71,11 @@ them before provider access, and expose stable redacted `400`, `404`, `429`,
 `502`, `503`, and `504` error responses. See the
 [public postcode API contract](docs/POSTCODE_API_CONTRACT.md) for accepted
 forms, error codes, correlation-ID rules, and consumer ownership.
+
+Place search accepts a restricted 2–80 character name and at most ten results.
+It uses the same LIVE provider deadlines, retry/circuit and safe telemetry as
+postcode lookup. See the [place-search contract](docs/PLACE_SEARCH_CONTRACT.md)
+for fields, privacy, fixture-mode behavior and deterministic testing rules.
 
 LIVE provider paths are constructed from isolated path segments. The gateway
 accepts additive provider fields but rejects missing or mismatched response

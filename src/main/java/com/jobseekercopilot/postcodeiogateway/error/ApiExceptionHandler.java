@@ -1,10 +1,12 @@
 package com.jobseekercopilot.postcodeiogateway.error;
 
 import com.jobseekercopilot.postcodeiogateway.client.ProviderCircuitOpenException;
+import com.jobseekercopilot.postcodeiogateway.client.ProviderModeUnavailableException;
 import com.jobseekercopilot.postcodeiogateway.client.ProviderNotFoundException;
 import com.jobseekercopilot.postcodeiogateway.client.ProviderResponseException;
 import com.jobseekercopilot.postcodeiogateway.logging.CorrelationIdFilter;
 import com.jobseekercopilot.postcodeiogateway.validation.InvalidPostcodeException;
+import com.jobseekercopilot.postcodeiogateway.validation.InvalidPlaceSearchException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -14,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -27,6 +30,28 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> invalidPostcode(InvalidPostcodeException error, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "INVALID_POSTCODE",
                 "Postcode must be a valid UK postcode or outcode.", error, request);
+    }
+
+    @ExceptionHandler(InvalidPlaceSearchException.class)
+    ResponseEntity<ApiError> invalidPlaceSearch(InvalidPlaceSearchException error, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "INVALID_PLACE_SEARCH",
+                "Place query or limit is invalid.", error, request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> invalidPlaceSearchParameter(
+            MethodArgumentTypeMismatchException error,
+            HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "INVALID_PLACE_SEARCH",
+                "Place query or limit is invalid.", error, request);
+    }
+
+    @ExceptionHandler(ProviderModeUnavailableException.class)
+    ResponseEntity<ApiError> providerModeUnavailable(
+            ProviderModeUnavailableException error,
+            HttpServletRequest request) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, "CAPABILITY_UNAVAILABLE",
+                "Place search is unavailable in the configured provider mode.", error, request);
     }
 
     @ExceptionHandler(ProviderNotFoundException.class)
@@ -100,7 +125,7 @@ public class ApiExceptionHandler {
             Exception error,
             HttpServletRequest request) {
         String correlationId = correlationId(request);
-        log.warn("postcode request failed correlationId={} status={} code={} error={}",
+        log.warn("provider request failed correlationId={} status={} code={} error={}",
                 correlationId, status.value(), code, error.getClass().getSimpleName());
         return ResponseEntity.status(status)
                 .body(new ApiError(status.value(), code, message, correlationId));

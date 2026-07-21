@@ -2,9 +2,11 @@ package com.jobseekercopilot.postcodeiogateway.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jobseekercopilot.postcodeiogateway.config.FixtureProperties;
+import com.jobseekercopilot.postcodeiogateway.model.PlaceLocation;
 import com.jobseekercopilot.postcodeiogateway.model.PostcodeLocation;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -55,6 +57,11 @@ public class FixturePostcodeProviderClient implements PostcodeProviderClient {
             location.setLatitude(decimal(body.latitude()));
             return location;
         });
+    }
+
+    @Override
+    public Mono<List<PlaceLocation>> searchPlaces(String query, int limit) {
+        return Mono.error(new ProviderModeUnavailableException());
     }
 
     private String text(String value, String fallback) {

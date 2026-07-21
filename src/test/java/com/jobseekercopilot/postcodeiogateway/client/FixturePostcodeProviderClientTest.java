@@ -105,4 +105,10 @@ class FixturePostcodeProviderClientTest {
         assertNotNull(result);
         assertEquals("LS1 1UR", result.getPostcode());
     }
+
+    @Test
+    void failsClosedWhenPlaceSearchIsUnavailableInFixtureMode() {
+        assertThrows(ProviderModeUnavailableException.class,
+                () -> client.searchPlaces("Leeds", 10).block());
+    }
 }

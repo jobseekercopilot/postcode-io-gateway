@@ -29,6 +29,82 @@ class PostcodeIoApiClientTest {
     private static final String OUTCODE_SUCCESS_BODY = """
             {"status":200,"result":{"outcode":"LS1","country":["England"],"region":["Yorkshire and The Humber"],"future_field":"ignored"},"future_envelope_field":true}
             """;
+    private static final String PLACE_SUCCESS_BODY = """
+            {"status":200,"result":[
+              {"code":"place-1","name_1":"St Albans","outcode":"AL1","region":"East of England","district_borough":"St Albans","latitude":51.7527,"longitude":-0.3394,"future_field":"ignored"},
+              {"code":"place-2","name_1":"St Albans Road","outcode":"WD24","region":"East of England","county_unitary":"Hertfordshire","latitude":51.68,"longitude":-0.4}
+            ],"future_envelope_field":true}
+            """;
+
+    @Test
+    void searchesPlacesWithEncodedBoundedQueryAndMapsRequiredFields() {
+        AtomicReference<String> rawPath = new AtomicReference<>();
+        AtomicReference<String> rawQuery = new AtomicReference<>();
+        PostcodeIoApiClient client = client(request -> {
+            rawPath.set(request.url().getRawPath());
+            rawQuery.set(request.url().getRawQuery());
+            return response(HttpStatus.OK, PLACE_SUCCESS_BODY);
+        }, properties(), new SimpleMeterRegistry(), new AtomicLong());
+
+        var results = client.searchPlaces("St Albans", 2).block();
+
+        assertThat(rawPath).hasValue("/places");
+        assertThat(rawQuery.get()).isEqualTo("q=St%20Albans&limit=2");
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).getId()).isEqualTo("place-1");
+        assertThat(results.get(0).getName()).isEqualTo("St Albans");
+        assertThat(results.get(0).getPostcode()).isEqualTo("AL1");
+        assertThat(results.get(1).getAdminDistrict()).isEqualTo("Hertfordshire");
+    }
+
+    @Test
+    void acceptsAnEmptyPlaceResultAndRejectsIncompatibleOrExcessiveResults() {
+        ProviderResilienceProperties properties = properties();
+        properties.setMaxRetries(0);
+        PostcodeIoApiClient emptyClient = client(request -> response(HttpStatus.OK,
+                "{\"status\":200,\"result\":[]}"), properties,
+                new SimpleMeterRegistry(), new AtomicLong());
+        assertThat(emptyClient.searchPlaces("Nowhere", 10).block()).isEmpty();
+
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        PostcodeIoApiClient malformedClient = client(request -> response(HttpStatus.OK,
+                "{\"status\":200,\"result\":[{\"code\":\"place-1\",\"name_1\":\"Leeds\"}]}"),
+                properties, meters, new AtomicLong());
+        assertThatThrownBy(() -> malformedClient.searchPlaces("Leeds", 1).block())
+                .isInstanceOf(ProviderResponseException.class);
+        assertThat(meters.get("postcode.provider.compatibility.failures").counter().count())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void retriesRateLimitedPlaceSearchWithinTheConfiguredBound() {
+        AtomicInteger calls = new AtomicInteger();
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        PostcodeIoApiClient client = client(request -> calls.incrementAndGet() == 1
+                ? response(HttpStatus.TOO_MANY_REQUESTS, "{}")
+                : response(HttpStatus.OK, "{\"status\":200,\"result\":[]}"),
+                properties(), meters, new AtomicLong());
+
+        assertThat(client.searchPlaces("Leeds", 10).block(Duration.ofSeconds(2))).isEmpty();
+        assertThat(calls).hasValue(2);
+        assertThat(meters.get("postcode.provider.retries").counter().count()).isEqualTo(1);
+    }
+
+    @Test
+    void appliesPerAttemptTimeoutToPlaceSearchAndStopsAfterBoundedRetries() {
+        AtomicInteger calls = new AtomicInteger();
+        ProviderResilienceProperties properties = properties();
+        properties.setResponseTimeout(Duration.ofMillis(20));
+        properties.setTotalTimeout(Duration.ofMillis(250));
+        PostcodeIoApiClient client = client(request -> {
+            calls.incrementAndGet();
+            return Mono.never();
+        }, properties, new SimpleMeterRegistry(), new AtomicLong());
+
+        assertThatThrownBy(() -> client.searchPlaces("Leeds", 10).block(Duration.ofSeconds(2)))
+                .hasRootCauseInstanceOf(TimeoutException.class);
+        assertThat(calls).hasValue(3);
+    }
 
     @Test
     void buildsProviderPathsFromIsolatedEncodedSegments() {
