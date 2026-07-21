@@ -39,23 +39,31 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         }
 
         long startedAt = System.nanoTime();
+        String safePath = safePath(request.getRequestURI());
         MDC.put(MDC_KEY, correlationId);
         MDC.put(SERVICE_MDC_KEY, serviceName);
         response.setHeader(HEADER_NAME, correlationId);
 
         try {
-            log.info("service={} request started method={} path={}", serviceName, request.getMethod(), request.getRequestURI());
+            log.info("service={} request started method={} path={}", serviceName, request.getMethod(), safePath);
             filterChain.doFilter(request, response);
         } finally {
             long durationMs = (System.nanoTime() - startedAt) / 1_000_000;
             log.info("service={} request completed method={} path={} status={} durationMs={}",
                     serviceName,
                     request.getMethod(),
-                    request.getRequestURI(),
+                    safePath,
                     response.getStatus(),
                     durationMs);
             MDC.remove(MDC_KEY);
             MDC.remove(SERVICE_MDC_KEY);
         }
+    }
+
+    static String safePath(String requestUri) {
+        if (requestUri != null && requestUri.startsWith("/api/postcodes/")) {
+            return "/api/postcodes/{postcode}";
+        }
+        return requestUri;
     }
 }
