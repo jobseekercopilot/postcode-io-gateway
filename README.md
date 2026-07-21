@@ -29,10 +29,16 @@ to source.
 - `/v3/api-docs`, `/swagger-ui/index.html`, `/actuator/health`
 
 ```bash
-mvn -B verify
+mvn -B clean verify
+./scripts/test-dependency-report-policy.sh
 mvn spring-boot:run
 docker build -t postcode-io-gateway .
 ```
+
+CI scans the resolved runtime dependency set with pinned Trivy releases,
+publishes the JSON report, and rejects unaccepted Critical or High findings.
+See [dependency security](docs/DEPENDENCY_SECURITY.md) for local reproduction,
+scanner scope, and the time-bounded exception process.
 
 The build has no local JAR dependency and succeeds from a clean clone. FIXTURE
 mode uses the small HTTP contract documented in
