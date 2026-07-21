@@ -11,3 +11,9 @@ arrange rotation with the owner.
 
 The current code is a beta-readiness baseline, not a security certification.
 Known risks and beta blockers are tracked in `docs/BETA_READINESS_AUDIT.md`.
+
+CI scans resolved runtime dependencies and fails when its machine-readable
+report contains an unaccepted Critical or High vulnerability. Exceptions must
+be linked to a private repository issue, expire within 30 days, and be removed
+when the finding is remediated. See `docs/DEPENDENCY_SECURITY.md` for the full
+policy and safe local reproduction steps.
