@@ -2,7 +2,7 @@
 
 Audit date: 18 July 2026
 
-Status: **Not beta-ready.** POSTCODE-01 through POSTCODE-05 and POSTCODE-08
+Status: **Not beta-ready.** POSTCODE-01 through POSTCODE-05, POSTCODE-07 and POSTCODE-08
 are remediated: the service builds without a local generated binary, LIVE calls
 are bounded by explicit resilience policy, provider mode fails closed, and CI
 blocks unaccepted Critical/High runtime dependency findings, the public
@@ -19,8 +19,21 @@ Full journey testing and the other findings below remain incomplete.
 | [POSTCODE-04](https://github.com/jobseekercopilot/postcode-io-gateway/issues/4) | Build provider URIs safely and monitor API compatibility | **Remediated:** validated values use URI-builder path segments; focused fixtures pin the minimum postcode/outcode response identity and additive-field behavior; incompatible responses increment a bounded metric. | The path-construction and silent schema-drift risks are resolved; an unversioned upstream can still break before operators react. | Retain fixtures, reviewed provider links, compatibility signal and documented change process. | Completed POSTCODE-03 and repository-owned compatibility contract. | No | S |
 | [POSTCODE-05](https://github.com/jobseekercopilot/postcode-io-gateway/issues/5) | Fail closed for fixture/live mode | **Remediated:** provider mode and environment class are explicit; a startup policy enforces safe combinations; diagnostics are opt-in and forbidden in production-like classes. | The High configuration risk is resolved; deployment manifests must continue to set both explicit values. | Retain the documented matrix, startup/context tests and restricted diagnostics default. | Repository-owned convention in `docs/PROVIDER_MODE_SECURITY.md`. | No | M |
 | [POSTCODE-06](https://github.com/jobseekercopilot/postcode-io-gateway/issues/6) | Expand provider and security testing | Unit-level LIVE resilience tests and MVC tests now cover validation, stable error mapping, redaction, and safe correlation IDs; no real LIVE HTTP stub or full location/browser failure journey exists. | **High / P1 testing:** the real HTTP boundary and complete consumer path remain incompletely proven. | Add WireMock-equivalent integration/contract tests and include the full location/browser journey. | POSTCODE-04 plus completed POSTCODE-02/03/05. | Yes | M |
-| [POSTCODE-07](https://github.com/jobseekercopilot/postcode-io-gateway/issues/7) | Harden container, health, telemetry and docs | Docker skips tests and runs root/mutable tags; health has no provider readiness; README is skeletal. | **Medium / P1 operational/docs:** no deployable/diagnosable beta baseline. | Pin/non-root/scan image, run verify, expose safe readiness, metrics/alerts/graceful shutdown and complete operational/proprietary docs. | POSTCODE-01/02. | Yes | M |
+| [POSTCODE-07](https://github.com/jobseekercopilot/postcode-io-gateway/issues/7) | Harden container, health, telemetry and docs | **Remediated:** aggregate passive provider/circuit readiness, operational signal/alert contracts, graceful shutdown and a test-enforcing digest-pinned non-root image with blocking image scan are present. | The repository operational baseline is complete; private exporter and target-environment alert delivery remain platform validation. | Retain runtime/readiness/privacy tests and prove alert delivery in the controlled beta environment. | POSTCODE-01/02 complete. | Yes | M |
 | [POSTCODE-08](https://github.com/jobseekercopilot/postcode-io-gateway/issues/8) | Establish reliable dependency vulnerability scanning | **Remediated:** CI scans Maven's resolved runtime libraries with pinned Trivy/action revisions, retains JSON evidence and applies a tested fail-closed policy. | The High dependency-gate risk is resolved; one Medium finding remains outside the Critical/High gate and advisory lag remains residual risk. | Keep scanner/action versions pinned and current; review reports and remove expired exceptions; retain policy negative tests. | Shared platform policy is documented in `docs/DEPENDENCY_SECURITY.md`. | No | M |
+
+## POSTCODE-07 remediation evidence
+
+- General health and provider-circuit readiness are aggregate-only and never
+  perform an external lookup or expose provider/request/error details.
+- Existing bounded request, latency, retry, cache, circuit and compatibility
+  metrics now have an explicit private-export, dashboard and alert contract.
+- Release validation runs the complete Maven suite before the image copies the
+  verified JAR. The runtime base is digest-pinned, runs as `10001:10001`, is
+  tested read-only through provider failure and graceful stop, and receives a
+  blocking Critical/High OS and library image scan.
+- README and operations documentation record the real API, configuration,
+  develop-only workflow, proprietary licence, ownership and residual risks.
 
 ## POSTCODE-01 remediation evidence
 

@@ -223,10 +223,12 @@ class PostcodeIoApiClientTest {
         assertThat(calls).hasValue(2);
         assertThat(meters.get("postcode.provider.circuit.state").gauge().value()).isEqualTo(2);
         assertThat(meters.get("postcode.provider.circuit.opens").counter().count()).isEqualTo(1);
+        assertThat(client.isReady()).isFalse();
         assertThat(meters.get("postcode.provider.requests").tag("outcome", "circuit_open").counter().count())
                 .isEqualTo(1);
 
         nanoTime.addAndGet(11);
+        assertThat(client.isReady()).isTrue();
         healthy.set(true);
         assertThat(client.fetchPostcodeDetails("LS4 4UR").block()).isNotNull();
         assertThat(calls).hasValue(3);

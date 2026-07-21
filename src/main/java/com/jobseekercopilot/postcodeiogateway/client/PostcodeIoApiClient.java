@@ -205,6 +205,11 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
         });
     }
 
+    @Override
+    public boolean isReady() {
+        return circuitBreaker.state() != ProviderCircuitBreaker.State.OPEN;
+    }
+
     private Mono<List<PlaceLocation>> placeSearchRequest(String query, int limit) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder.pathSegment("places")

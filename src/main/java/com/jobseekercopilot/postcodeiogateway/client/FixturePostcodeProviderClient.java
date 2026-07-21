@@ -64,6 +64,11 @@ public class FixturePostcodeProviderClient implements PostcodeProviderClient {
         return Mono.error(new ProviderModeUnavailableException());
     }
 
+    @Override
+    public boolean isReady() {
+        return true;
+    }
+
     private String text(String value, String fallback) {
         return value == null ? fallback : value;
     }
