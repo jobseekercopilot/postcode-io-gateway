@@ -67,6 +67,7 @@ and failure body.
 The postcode gateway owns validation, canonicalisation, provider-failure
 translation, and these stable public codes. Location and browser consumers own
 their presentation and retry decisions and must branch on `status`/`code`, not
-message text. POSTCODE-04 remains responsible for provider URI/schema
-compatibility; POSTCODE-06 remains responsible for the full HTTP-stub and
-browser/location journey.
+message text. The provider URI/schema boundary and monitoring policy are
+documented in [the compatibility contract](PROVIDER_COMPATIBILITY.md).
+POSTCODE-06 remains responsible for the full HTTP-stub and browser/location
+journey.

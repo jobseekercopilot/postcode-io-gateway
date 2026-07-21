@@ -5,8 +5,8 @@ Spring Boot boundary for postcode/outcode lookup. LIVE mode calls
 test data.
 
 > Beta status: not beta-ready. The fixture client is an in-repository HTTP
-> boundary and live calls are bounded, but provider compatibility and full
-> consumer-journey coverage remain incomplete.
+> boundary, live calls are bounded, and the consumed provider contract is
+> monitored, but full consumer-journey coverage remains incomplete.
 > See [the audit](docs/BETA_READINESS_AUDIT.md).
 
 ## Requirements and configuration
@@ -70,6 +70,13 @@ them before provider access, and expose stable redacted `400`, `404`, `429`,
 `502`, `503`, and `504` error responses. See the
 [public postcode API contract](docs/POSTCODE_API_CONTRACT.md) for accepted
 forms, error codes, correlation-ID rules, and consumer ownership.
+
+LIVE provider paths are constructed from isolated path segments. The gateway
+accepts additive provider fields but rejects missing or mismatched response
+identity and increments a bounded compatibility-failure metric. See the
+[Postcodes.io compatibility contract](docs/PROVIDER_COMPATIBILITY.md) for the
+reviewed upstream assumptions, fixtures, alert signal, change process, and
+residual risk.
 
 ## Branch workflow and troubleshooting
 

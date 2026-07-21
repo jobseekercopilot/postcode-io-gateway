@@ -1,5 +1,6 @@
 package com.jobseekercopilot.postcodeiogateway.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jobseekercopilot.postcodeiogateway.config.ExternalProviderProperties;
 import com.jobseekercopilot.postcodeiogateway.config.ProviderResilienceProperties;
@@ -47,6 +48,7 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
     private final MeterRegistry meterRegistry;
     private final Counter retryCounter;
     private final Counter circuitOpenCounter;
+    private final Counter compatibilityFailureCounter;
     private final ProviderCircuitBreaker circuitBreaker;
     private final ProviderCache cache;
     private final LongSupplier nanoTime;
@@ -75,6 +77,9 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
                 .register(meterRegistry);
         this.circuitOpenCounter = Counter.builder("postcode.provider.circuit.opens")
                 .description("Postcode provider circuit transitions to open")
+                .register(meterRegistry);
+        this.compatibilityFailureCounter = Counter.builder("postcode.provider.compatibility.failures")
+                .description("Postcode provider responses that violate the consumed contract")
                 .register(meterRegistry);
         this.circuitBreaker = new ProviderCircuitBreaker(
                 resilienceProperties.getCircuitFailureThreshold(),
@@ -158,26 +163,53 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
     private Mono<PostcodeLocation> providerRequest(String clean, boolean outcode) {
         if (outcode) {
             return webClient.get()
-                    .uri("/outcodes/" + clean)
+                    .uri(uriBuilder -> uriBuilder.pathSegment("outcodes", clean).build())
                     .retrieve()
                     .onStatus(status -> status.value() == 404, response ->
                             response.releaseBody().then(Mono.error(new ProviderNotFoundException())))
                     .bodyToMono(OutcodeResponse.class)
                     .switchIfEmpty(Mono.error(new ProviderResponseException()))
-                    .flatMap(response -> response.getResult() == null
-                            ? Mono.error(new ProviderResponseException())
-                            : Mono.just(toLocation(response.getResult())));
+                    .flatMap(response -> compatibleOutcodeResponse(response, clean));
         }
         return webClient.get()
-                .uri("/postcodes/" + clean)
+                .uri(uriBuilder -> uriBuilder.pathSegment("postcodes", clean).build())
                 .retrieve()
                 .onStatus(status -> status.value() == 404, response ->
                         response.releaseBody().then(Mono.error(new ProviderNotFoundException())))
                 .bodyToMono(PostcodeResponse.class)
                 .switchIfEmpty(Mono.error(new ProviderResponseException()))
-                .flatMap(response -> response.getResult() == null
-                        ? Mono.error(new ProviderResponseException())
-                        : Mono.just(response.getResult()));
+                .flatMap(response -> compatiblePostcodeResponse(response, clean));
+    }
+
+    private Mono<PostcodeLocation> compatiblePostcodeResponse(PostcodeResponse response, String expectedPostcode) {
+        if (response.getStatus() == null
+                || response.getStatus() != 200
+                || response.getResult() == null
+                || !StringUtils.hasText(response.getResult().getPostcode())
+                || !normaliseIdentity(response.getResult().getPostcode()).equals(expectedPostcode)) {
+            return incompatibleProviderResponse();
+        }
+        return Mono.just(response.getResult());
+    }
+
+    private Mono<PostcodeLocation> compatibleOutcodeResponse(OutcodeResponse response, String expectedOutcode) {
+        if (response.getStatus() == null
+                || response.getStatus() != 200
+                || response.getResult() == null
+                || !StringUtils.hasText(response.getResult().getOutcode())
+                || !normaliseIdentity(response.getResult().getOutcode()).equals(expectedOutcode)) {
+            return incompatibleProviderResponse();
+        }
+        return Mono.just(toLocation(response.getResult()));
+    }
+
+    private Mono<PostcodeLocation> incompatibleProviderResponse() {
+        compatibilityFailureCounter.increment();
+        return Mono.error(new ProviderResponseException());
+    }
+
+    private static String normaliseIdentity(String value) {
+        return value.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
     }
 
     private PostcodeLocation toLocation(OutcodeResult result) {
@@ -286,18 +318,23 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
 
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private static class PostcodeResponse {
+        private Integer status;
         private PostcodeLocation result;
     }
 
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private static class OutcodeResponse {
+        private Integer status;
         private OutcodeResult result;
     }
 
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private static class OutcodeResult {
         private String outcode;
         private List<String> region;
