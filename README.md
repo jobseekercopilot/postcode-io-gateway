@@ -4,8 +4,8 @@ Spring Boot boundary for postcode/outcode lookup. LIVE mode calls
 `api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
 test data.
 
-> Beta status: not beta-ready. Fixture mode has an unapproved generated binary
-> dependency and live-provider resilience/error mapping is incomplete. See
+> Beta status: not beta-ready. The fixture client is now an in-repository HTTP
+> boundary, but live-provider resilience/error mapping is incomplete. See
 > [the audit](docs/BETA_READINESS_AUDIT.md).
 
 ## Requirements and configuration
@@ -17,7 +17,7 @@ test data.
 | `SERVER_PORT` | `8082` | HTTP port |
 | `EXTERNAL_PROVIDER_MODE` | `LIVE` | `LIVE` or `FIXTURE` |
 | `SYSTEM_DATA_SERVICE_URL` | `http://localhost:8103` | Fixture dependency |
-| `FIXTURE_DATASET_ID` / `FIXTURE_DATASET_VERSION` / `FIXTURE_SCENARIO` | demo values | Deterministic fixture selection |
+| `FIXTURE_DATASET_ID` / `FIXTURE_DATASET_VERSION` / `FIXTURE_SCENARIO` | demo values | Fixture safety metadata exposed by the existing internal mode endpoint |
 
 No provider credential is currently required by postcodes.io. Do not add one
 to source.
@@ -34,8 +34,10 @@ mvn spring-boot:run
 docker build -t postcode-io-gateway .
 ```
 
-The clean build fails until POSTCODE-01 removes the local system-data client
-JAR. Do not create an additional repository without approval.
+The build has no local JAR dependency and succeeds from a clean clone. FIXTURE
+mode uses the small HTTP contract documented in
+[`docs/FIXTURE_POSTCODE_CONTRACT.md`](docs/FIXTURE_POSTCODE_CONTRACT.md); do not
+restore generated binaries or create another repository for it.
 
 ## Branch workflow and troubleshooting
 
