@@ -2,11 +2,12 @@
 
 Audit date: 18 July 2026
 
-Status: **Not beta-ready.** POSTCODE-01, POSTCODE-02, POSTCODE-05 and POSTCODE-08
+Status: **Not beta-ready.** POSTCODE-01, POSTCODE-02, POSTCODE-03, POSTCODE-05 and POSTCODE-08
 are remediated: the service builds without a local generated binary, LIVE calls
 are bounded by explicit resilience policy, provider mode fails closed, and CI
-blocks unaccepted Critical/High runtime dependency findings. Public error
-handling and the other findings below remain incomplete.
+blocks unaccepted Critical/High runtime dependency findings, and the public
+validation/error contract is stable. Provider compatibility, full journey
+testing, and the other findings below remain incomplete.
 
 ## Findings
 
@@ -14,10 +15,10 @@ handling and the other findings below remain incomplete.
 |---|---|---|---|---|---|---|---|
 | [POSTCODE-01](https://github.com/jobseekercopilot/postcode-io-gateway/issues/1) | Remove the out-of-scope `system-data-service` binary dependency | **Remediated:** Maven, Docker and source no longer reference the generated client or `libs`; FIXTURE mode uses a minimal repository-owned HTTP response contract with focused mapping/failure tests. | The Critical clean-build and undeclared binary dependency risk is resolved; fixture environment controls remain tracked by POSTCODE-05. | Keep the documented fixture response fields compatible and retain clean-clone/contract verification. | No external repository or package was introduced. | No | L |
 | [POSTCODE-02](https://github.com/jobseekercopilot/postcode-io-gateway/issues/2) | Add provider timeout, retry, circuit and cache policy | **Remediated:** LIVE calls use connect/response/total deadlines, bounded jittered retry, a half-open circuit, capped positive/negative caches and Micrometer signals. | The High cascading-outage risk is bounded; per-instance state and external provider behavior remain documented residual risks. | Retain the tested budgets and tune them only with observed metrics and documented ownership. | Service-owned objective and alert starting points in `docs/PROVIDER_RESILIENCE.md`. | No | L |
-| [POSTCODE-03](https://github.com/jobseekercopilot/postcode-io-gateway/issues/3) | Validate requests and preserve meaningful status codes | `postcode.replaceAll` assumes non-null; no postcode format/length validation; controller converts every error to empty 500. | **High / P1 API:** invalid/not-found/rate-limit/outage are indistinguishable and clients cannot recover correctly. | Canonicalise with a documented validator; map 400/404/429/502/503/504 to stable redacted errors; test full/outcode/invalid/empty/partial. | Location error contract. | Yes | M |
-| [POSTCODE-04](https://github.com/jobseekercopilot/postcode-io-gateway/issues/4) | Build provider URIs safely and monitor API compatibility | Paths are concatenated strings and response DTOs assume current provider shapes; no compatibility alert/test exists. | **Medium / P2 reliability/security:** unexpected encoded input or provider schema change causes failures. | Use URI builder/path segments, validate before construction, pin/document provider version assumptions and run contract fixtures. | POSTCODE-03. | No | S |
+| [POSTCODE-03](https://github.com/jobseekercopilot/postcode-io-gateway/issues/3) | Validate requests and preserve meaningful status codes | **Remediated:** a bounded UK postcode/outcode validator canonicalises input before provider access; stable redacted responses distinguish 400/404/429/502/503/504 and include a safe correlation ID. | The High ambiguous-error/input-handling risk is resolved; end-to-end consumer behavior remains tracked by POSTCODE-06. | Retain the documented contract and focused validator/controller/security tests. | Gateway-owned location error contract in `docs/POSTCODE_API_CONTRACT.md`. | No | M |
+| [POSTCODE-04](https://github.com/jobseekercopilot/postcode-io-gateway/issues/4) | Build provider URIs safely and monitor API compatibility | Input is now validated/canonicalised before provider access, but LIVE paths are concatenated strings and response DTOs assume current provider shapes; no compatibility alert/test exists. | **Medium / P2 reliability/security:** the injection surface is bounded by POSTCODE-03, but provider schema changes can still cause failures. | Use URI builder/path segments, pin/document provider version assumptions and run contract fixtures. | Completed POSTCODE-03. | No | S |
 | [POSTCODE-05](https://github.com/jobseekercopilot/postcode-io-gateway/issues/5) | Fail closed for fixture/live mode | **Remediated:** provider mode and environment class are explicit; a startup policy enforces safe combinations; diagnostics are opt-in and forbidden in production-like classes. | The High configuration risk is resolved; deployment manifests must continue to set both explicit values. | Retain the documented matrix, startup/context tests and restricted diagnostics default. | Repository-owned convention in `docs/PROVIDER_MODE_SECURITY.md`. | No | M |
-| [POSTCODE-06](https://github.com/jobseekercopilot/postcode-io-gateway/issues/6) | Expand provider and security testing | Unit-level LIVE boundary tests now cover timeout, 429 retry, outage/circuit recovery, caches and metrics, and mode-safety has context coverage; no real LIVE HTTP stub, malformed-payload/correlation contract or full location/browser failure journey exists. | **High / P1 testing:** the real HTTP boundary and complete consumer path remain incompletely proven. | Add WireMock-equivalent integration/contract tests and include full location/browser journey. | POSTCODE-03/04 plus completed POSTCODE-02/05. | Yes | M |
+| [POSTCODE-06](https://github.com/jobseekercopilot/postcode-io-gateway/issues/6) | Expand provider and security testing | Unit-level LIVE resilience tests and MVC tests now cover validation, stable error mapping, redaction, and safe correlation IDs; no real LIVE HTTP stub or full location/browser failure journey exists. | **High / P1 testing:** the real HTTP boundary and complete consumer path remain incompletely proven. | Add WireMock-equivalent integration/contract tests and include the full location/browser journey. | POSTCODE-04 plus completed POSTCODE-02/03/05. | Yes | M |
 | [POSTCODE-07](https://github.com/jobseekercopilot/postcode-io-gateway/issues/7) | Harden container, health, telemetry and docs | Docker skips tests and runs root/mutable tags; health has no provider readiness; README is skeletal. | **Medium / P1 operational/docs:** no deployable/diagnosable beta baseline. | Pin/non-root/scan image, run verify, expose safe readiness, metrics/alerts/graceful shutdown and complete operational/proprietary docs. | POSTCODE-01/02. | Yes | M |
 | [POSTCODE-08](https://github.com/jobseekercopilot/postcode-io-gateway/issues/8) | Establish reliable dependency vulnerability scanning | **Remediated:** CI scans Maven's resolved runtime libraries with pinned Trivy/action revisions, retains JSON evidence and applies a tested fail-closed policy. | The High dependency-gate risk is resolved; one Medium finding remains outside the Critical/High gate and advisory lag remains residual risk. | Keep scanner/action versions pinned and current; review reports and remove expired exceptions; retain policy negative tests. | Shared platform policy is documented in `docs/DEPENDENCY_SECURITY.md`. | No | M |
 
@@ -84,6 +85,23 @@ remained open.
 - Focused tests cover 429 retry, timeout exhaustion, outage/open rejection,
   recovery, positive/negative cache expiry, metrics and unsafe configuration.
 
-This resolves POSTCODE-01, POSTCODE-02, POSTCODE-05 and POSTCODE-08 only.
-POSTCODE-03, POSTCODE-04, POSTCODE-06 and POSTCODE-07 remain open, so the
+## POSTCODE-03 remediation evidence
+
+- A single bounded validator accepts UK full postcodes and outcodes, removes
+  whitespace, uppercases safely, and sends only the canonical form downstream.
+- Empty, oversized, partial, non-ASCII, and structurally malformed inputs fail
+  with a stable `400` before provider access.
+- Provider absence, terminal rate limiting, transport/response failure, open
+  circuit, and timeout map to stable redacted `404`, `429`, `502`, `503`, and
+  `504` responses respectively.
+- MVC and focused unit tests cover successful responses, full postcode/outcode
+  canonicalisation, invalid and empty input, every public failure class,
+  fixture `found=false`, correlation IDs, and response-detail redaction.
+- Submitted postcodes are absent from request logs and error bodies; unsafe
+  correlation IDs are replaced before use in logs or response headers.
+- The location-consumer contract and ownership boundary are documented in
+  `docs/POSTCODE_API_CONTRACT.md`.
+
+This resolves POSTCODE-01, POSTCODE-02, POSTCODE-03, POSTCODE-05 and
+POSTCODE-08 only. POSTCODE-04, POSTCODE-06 and POSTCODE-07 remain open, so the
 service is still **not beta-ready**.

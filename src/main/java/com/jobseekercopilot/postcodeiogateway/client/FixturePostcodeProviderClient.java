@@ -40,17 +40,19 @@ public class FixturePostcodeProviderClient implements PostcodeProviderClient {
                     .toEntity(FixturePostcodeResponse.class)
                     .getBody();
 
-            PostcodeLocation location = new PostcodeLocation();
-            if (body != null) {
-                location.setPostcode(text(body.postcode(), decodedPostcode));
-                location.setCountry(body.country());
-                location.setRegion(body.region());
-                location.setAdminDistrict(body.adminDistrict());
-                location.setLongitude(decimal(body.longitude()));
-                location.setLatitude(decimal(body.latitude()));
+            boolean found = body != null && Boolean.TRUE.equals(body.found());
+            log.info("postcode fixture lookup completed found={}", found);
+            if (!found) {
+                throw new ProviderNotFoundException();
             }
-            log.info("postcode fixture lookup completed found={}",
-                    body != null && Boolean.TRUE.equals(body.found()));
+
+            PostcodeLocation location = new PostcodeLocation();
+            location.setPostcode(text(body.postcode(), decodedPostcode));
+            location.setCountry(body.country());
+            location.setRegion(body.region());
+            location.setAdminDistrict(body.adminDistrict());
+            location.setLongitude(decimal(body.longitude()));
+            location.setLatitude(decimal(body.latitude()));
             return location;
         });
     }
