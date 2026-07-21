@@ -119,3 +119,22 @@ remained open.
 This resolves POSTCODE-01 through POSTCODE-05 and POSTCODE-08 only. POSTCODE-06
 and POSTCODE-07 remain open, so the
 service is still **not beta-ready**.
+
+## LOC-02 provider support evidence
+
+- The provider gateway exposes a bounded `/api/places` contract in LIVE mode
+  and builds the official `/places?q=...&limit=...` URI with isolated encoded
+  query parameters.
+- Query/limit validation runs before provider access. Required output fields,
+  result count, text lengths and coordinate ranges are checked; additive
+  provider fields remain compatible and drift fails closed.
+- Search shares provider deadlines, bounded transient retry, circuit and
+  low-cardinality telemetry without logging or tagging query values.
+- FIXTURE mode returns a stable `503` because its approved external fixture
+  contract has no place dataset; deterministic tests use a loopback LIVE stub.
+- Provider, controller and validator tests cover multiple/empty results,
+  normalization, encoded queries, 429 retry, incompatible responses, redacted
+  errors and fail-closed fixture behavior.
+
+This supporting change does not close POSTCODE-06 or POSTCODE-07 and does not
+make the service beta-ready.

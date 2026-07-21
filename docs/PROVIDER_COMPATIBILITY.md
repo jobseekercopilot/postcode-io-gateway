@@ -4,6 +4,7 @@ Reviewed against the official Postcodes.io documentation on 21 July 2026:
 
 - [postcode lookup](https://postcodes.io/docs/postcode/lookup/)
 - [outcode lookup](https://postcodes.io/docs/outcode/lookup/)
+- [place query](https://postcodes.io/docs/place/query/)
 
 Postcodes.io does not expose a versioned URL for these operations. This gateway
 therefore pins the small response contract it consumes instead of treating the
@@ -18,6 +19,7 @@ segments:
 |---|---|---|
 | Full postcode | `/postcodes/{postcode}` | top-level `status` is `200`; `result.postcode` is present and identifies the requested postcode |
 | Outcode | `/outcodes/{outcode}` | top-level `status` is `200`; `result.outcode` is present and identifies the requested outcode |
+| Place search | `/places?q={query}&limit={limit}` | top-level `status` is `200`; result is an array no larger than the requested limit; every item has code, primary name, outcode, region and coordinates |
 
 Unknown response properties are ignored so additive provider changes remain
 compatible. A missing envelope status, missing identity, mismatched identity,

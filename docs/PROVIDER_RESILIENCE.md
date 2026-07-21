@@ -3,7 +3,7 @@
 ## Request budget
 
 The gateway owns this initial operational objective; it is not a guarantee from
-postcodes.io. A logical LIVE lookup has a four-second total deadline. Each
+postcodes.io. A logical LIVE postcode lookup or place search has a four-second total deadline. Each
 network attempt has a 500 ms connection deadline and a one-second response
 deadline. At most two retries are allowed, with 100–500 ms exponential backoff
 and 50% jitter, so a single caller cannot retry indefinitely or synchronize a
@@ -31,13 +31,14 @@ responses or other caller errors.
 
 Successful responses are cached for 15 minutes and 404 responses for one
 minute. The cache is local to each instance, uses normalized postcode/outcode
-keys, is capped at 1,000 entries and evicts least-recently-used entries. Valid
+keys, is capped at 1,000 entries and evicts least-recently-used entries. Place
+search is not cached without a separately measured freshness policy. Valid
 cached responses are served before the circuit check. Cache contents are not
 shared or persisted, and expired values are never served as stale data.
 
 ## Metrics and alert starting points
 
-Micrometer registers only bounded-cardinality metrics; postcode values, URLs,
+Micrometer registers only bounded-cardinality metrics; postcode/query values, URLs,
 response bodies and credentials are never tags:
 
 | Metric | Tags/values | Meaning |
@@ -63,6 +64,5 @@ Use these initial alert thresholds until traffic establishes a better baseline:
 
 The service owner owns the request budget, alert tuning and capacity review.
 The platform/deployment owner owns registry export, dashboards and routing.
-Residual risks are per-instance cache/circuit state, upstream advisory or
-latency changes, and callers still receiving generic 500 responses until
-POSTCODE-03 implements the public error contract.
+Residual risks are per-instance cache/circuit state and upstream advisory,
+schema or latency changes. The stable public error contract remains mandatory.
