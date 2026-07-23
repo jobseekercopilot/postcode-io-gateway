@@ -31,10 +31,19 @@ zero High findings. One Medium finding remained; it is outside the approved
 Critical/High gate and remains subject to routine dependency maintenance.
 There are no active risk exceptions.
 
+Spring Boot 4.1.0 manages Netty 4.2.15.Final by default. The beta-stack image
+scan subsequently identified five fixed High findings in that release:
+CVE-2026-59901, CVE-2026-55831, CVE-2026-55833, CVE-2026-56745 and
+CVE-2026-56816. `pom.xml` therefore overrides Boot's `netty.version` property
+to 4.2.16.Final, the fixed compatible 4.2.x release. Keep the override until a
+future Spring Boot dependency BOM manages the same or a later fixed version;
+verify the resolved `io.netty` dependency tree before removing it.
+
 ## Local verification
 
 ```bash
 mvn -B clean verify
+mvn -B dependency:tree -Dincludes=io.netty
 ./scripts/test-dependency-report-policy.sh
 
 mvn -B dependency:copy-dependencies \
