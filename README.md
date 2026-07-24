@@ -9,6 +9,10 @@ test data.
 > monitored, but full consumer-journey coverage remains incomplete.
 > See [the audit](docs/BETA_READINESS_AUDIT.md).
 
+Postcode acquisition is an upstream profile concern, not part of Job Search
+provider fan-out. That boundary is defined in the Infrastructure
+[Job Search architecture ADR](https://github.com/jobseekercopilot/infrastructure/blob/develop/docs/adr/0001-job-search-architecture-and-ownership.md).
+
 ## Requirements and configuration
 
 - Java 17 and Maven 3.9
