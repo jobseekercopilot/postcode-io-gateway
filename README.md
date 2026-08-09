@@ -1,5 +1,13 @@
 # Postcode.io Gateway
 
+## Role in Job Seeker Copilot
+
+| Role | Called by | Calls | Data | Local port |
+|---|---|---|---|---:|
+| Provider boundary for UK place and postcode lookup | Location Gateway | Postcodes.io in live mode or System Data fixtures | None | 8082 |
+
+See the central [location journey](https://docs.jobseekercopilot.com/journeys/location/), [provider integrations](https://docs.jobseekercopilot.com/services/provider-integrations/), and [configuration reference](https://docs.jobseekercopilot.com/operations/configuration/).
+
 Spring Boot boundary for postcode/outcode lookup and bounded place-name search. LIVE mode calls
 `api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
 test data.
