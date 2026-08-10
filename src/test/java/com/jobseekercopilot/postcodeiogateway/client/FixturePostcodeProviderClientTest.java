@@ -107,8 +107,26 @@ class FixturePostcodeProviderClientTest {
     }
 
     @Test
-    void failsClosedWhenPlaceSearchIsUnavailableInFixtureMode() {
-        assertThrows(ProviderModeUnavailableException.class,
-                () -> client.searchPlaces("Leeds", 10).block());
+    void mapsBoundedPlaceSearchFromSystemData() {
+        server.expect(once(), requestTo("http://fixture.test/internal/fixtures/places?query=Leeds&limit=2"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        [{
+                          "id":"4b1ae7e5-450a-3f0d-acaf-3e4f40aa67a1",
+                          "name":"Leeds, Yorkshire and The Humber",
+                          "postcode":"LS1 1UR",
+                          "region":"Yorkshire and The Humber",
+                          "adminDistrict":"Leeds",
+                          "latitude":53.8008,
+                          "longitude":-1.5491
+                        }]
+                        """, MediaType.APPLICATION_JSON));
+
+        var results = client.searchPlaces("Leeds", 2).block();
+
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        assertEquals("Leeds, Yorkshire and The Humber", results.get(0).getName());
+        assertEquals("LS1 1UR", results.get(0).getPostcode());
     }
 }
