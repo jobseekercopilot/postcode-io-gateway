@@ -4,7 +4,7 @@
 
 | Role | Called by | Calls | Data | Local port |
 |---|---|---|---|---:|
-| Provider boundary for UK place and postcode lookup | Location Gateway | Postcodes.io in live mode or System Data fixtures | None | 8082 |
+| Provider boundary for UK place and postcode lookup | Location Service | Postcodes.io in live mode or System Data fixtures | None | 8082 |
 
 See the central [location journey](https://docs.jobseekercopilot.com/journeys/location/), [provider integrations](https://docs.jobseekercopilot.com/services/provider-integrations/), and [configuration reference](https://docs.jobseekercopilot.com/operations/configuration/).
 
@@ -12,9 +12,10 @@ Spring Boot boundary for postcode/outcode lookup and bounded place-name search. 
 `api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
 test data.
 
-> Beta status: not beta-ready. The fixture client is an in-repository HTTP
-> boundary, live calls are bounded, and the consumed provider contract is
-> monitored, but full consumer-journey coverage remains incomplete.
+> Delivery status: implemented and composed for controlled private-beta use.
+> The fixture client is an in-repository HTTP boundary, live calls are bounded,
+> and the consumed provider contract is monitored. This is not a production
+> availability guarantee.
 > See [the audit](docs/BETA_READINESS_AUDIT.md).
 
 Postcode acquisition is an upstream profile concern, not part of Job Search
