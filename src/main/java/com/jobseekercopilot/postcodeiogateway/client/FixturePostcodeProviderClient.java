@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import reactor.core.publisher.Mono;
@@ -61,7 +62,20 @@ public class FixturePostcodeProviderClient implements PostcodeProviderClient {
 
     @Override
     public Mono<List<PlaceLocation>> searchPlaces(String query, int limit) {
-        return Mono.error(new ProviderModeUnavailableException());
+        return Mono.fromSupplier(() -> {
+            List<PlaceLocation> body = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .pathSegment("internal", "fixtures", "places")
+                            .queryParam("query", query)
+                            .queryParam("limit", limit)
+                            .build())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<List<PlaceLocation>>() { });
+            List<PlaceLocation> results = body == null ? List.of() : body;
+            log.info("place fixture search completed resultCount={}", results.size());
+            return results;
+        });
     }
 
     @Override
