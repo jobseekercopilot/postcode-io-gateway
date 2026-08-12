@@ -293,7 +293,9 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
                 || response.getStatus() != 200
                 || response.getResult() == null
                 || !StringUtils.hasText(response.getResult().getPostcode())
-                || !normaliseIdentity(response.getResult().getPostcode()).equals(expectedPostcode)) {
+                || !normaliseIdentity(response.getResult().getPostcode()).equals(expectedPostcode)
+                || !boundedCoordinate(response.getResult().getLatitude(), -90, 90)
+                || !boundedCoordinate(response.getResult().getLongitude(), -180, 180)) {
             return incompatibleProviderResponse();
         }
         return Mono.just(response.getResult());
@@ -304,7 +306,9 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
                 || response.getStatus() != 200
                 || response.getResult() == null
                 || !StringUtils.hasText(response.getResult().getOutcode())
-                || !normaliseIdentity(response.getResult().getOutcode()).equals(expectedOutcode)) {
+                || !normaliseIdentity(response.getResult().getOutcode()).equals(expectedOutcode)
+                || !boundedCoordinate(response.getResult().getLatitude(), -90, 90)
+                || !boundedCoordinate(response.getResult().getLongitude(), -180, 180)) {
             return incompatibleProviderResponse();
         }
         return Mono.just(toLocation(response.getResult()));
@@ -331,6 +335,8 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
         if (result.getCountry() != null && !result.getCountry().isEmpty()) {
             location.setCountry(result.getCountry().get(0));
         }
+        location.setLatitude(result.getLatitude());
+        location.setLongitude(result.getLongitude());
         return location;
     }
 
@@ -448,6 +454,8 @@ public class PostcodeIoApiClient implements PostcodeProviderClient {
         @JsonProperty("admin_district")
         private List<String> adminDistrict;
         private List<String> country;
+        private Double latitude;
+        private Double longitude;
     }
 
     @Getter
