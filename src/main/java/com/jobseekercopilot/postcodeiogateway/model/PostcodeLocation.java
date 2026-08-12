@@ -14,8 +14,8 @@ public class PostcodeLocation {
     private String parliamentaryConstituency;
     private String eastings;
     private String northings;
-    private double longitude;
-    private double latitude;
+    private Double longitude;
+    private Double latitude;
     @JsonProperty("european_electoral_region")
     private String europeanElectoralRegion;
     @JsonProperty("primary_care_trust")

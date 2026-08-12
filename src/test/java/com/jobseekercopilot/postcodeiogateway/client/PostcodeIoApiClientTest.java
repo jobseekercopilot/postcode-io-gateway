@@ -24,10 +24,10 @@ import reactor.core.publisher.Mono;
 
 class PostcodeIoApiClientTest {
     private static final String SUCCESS_BODY = """
-            {"status":200,"result":{"postcode":"LS1 1UR","country":"England","region":"Yorkshire and The Humber"}}
+            {"status":200,"result":{"postcode":"LS1 1UR","country":"England","region":"Yorkshire and The Humber","latitude":53.7965,"longitude":-1.5478}}
             """;
     private static final String OUTCODE_SUCCESS_BODY = """
-            {"status":200,"result":{"outcode":"LS1","country":["England"],"region":["Yorkshire and The Humber"],"future_field":"ignored"},"future_envelope_field":true}
+            {"status":200,"result":{"outcode":"LS1","country":["England"],"region":["Yorkshire and The Humber"],"latitude":53.7976,"longitude":-1.5480,"future_field":"ignored"},"future_envelope_field":true}
             """;
     private static final String PLACE_SUCCESS_BODY = """
             {"status":200,"result":[
@@ -132,7 +132,33 @@ class PostcodeIoApiClientTest {
         assertThat(result).isNotNull();
         assertThat(result.getPostcode()).isEqualTo("LS1");
         assertThat(result.getCountry()).isEqualTo("England");
+        assertThat(result.getLatitude()).isEqualTo(53.7976);
+        assertThat(result.getLongitude()).isEqualTo(-1.5480);
         assertThat(rawPath).hasValue("/outcodes/LS1");
+    }
+
+    @Test
+    void rejectsAnOutcodeResponseWithoutCanonicalCoordinates() {
+        ProviderResilienceProperties properties = properties();
+        properties.setMaxRetries(0);
+        PostcodeIoApiClient client = client(request -> response(HttpStatus.OK,
+                "{\"status\":200,\"result\":{\"outcode\":\"LS1\"}}"),
+                properties, new SimpleMeterRegistry(), new AtomicLong());
+
+        assertThatThrownBy(() -> client.fetchPostcodeDetails("LS1").block())
+                .isInstanceOf(ProviderResponseException.class);
+    }
+
+    @Test
+    void rejectsAFullPostcodeResponseWithoutCanonicalCoordinates() {
+        ProviderResilienceProperties properties = properties();
+        properties.setMaxRetries(0);
+        PostcodeIoApiClient client = client(request -> response(HttpStatus.OK,
+                "{\"status\":200,\"result\":{\"postcode\":\"LS1 1UR\"}}"),
+                properties, new SimpleMeterRegistry(), new AtomicLong());
+
+        assertThatThrownBy(() -> client.fetchPostcodeDetails("LS1 1UR").block())
+                .isInstanceOf(ProviderResponseException.class);
     }
 
     @Test
@@ -357,6 +383,7 @@ class PostcodeIoApiClientTest {
     }
 
     private static String successBody(String postcode) {
-        return "{\"status\":200,\"result\":{\"postcode\":\"" + postcode + "\"}}";
+        return "{\"status\":200,\"result\":{\"postcode\":\"" + postcode
+                + "\",\"latitude\":53.7965,\"longitude\":-1.5478}}";
     }
 }
