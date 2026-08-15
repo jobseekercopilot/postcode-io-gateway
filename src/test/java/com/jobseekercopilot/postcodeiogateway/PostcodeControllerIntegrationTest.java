@@ -8,6 +8,7 @@ import com.jobseekercopilot.postcodeiogateway.logging.CorrelationIdFilter;
 import com.jobseekercopilot.postcodeiogateway.model.PostcodeLocation;
 import com.jobseekercopilot.postcodeiogateway.service.PostcodeService;
 import com.jobseekercopilot.postcodeiogateway.validation.InvalidPostcodeException;
+import com.jobseekercopilot.postcodeiogateway.validation.UnsupportedPostcodeCoverageException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,23 @@ public class PostcodeControllerIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(output)
                 .contains("path=/api/postcodes/{postcode}", "status=400")
                 .doesNotContain("INVALID-SECRET");
+    }
+
+    @Test
+    void mapsUnapprovedCoverageToAStableRedacted422Response(CapturedOutput output)
+            throws Exception {
+        errorRequest("BT1-PRIVATE", new UnsupportedPostcodeCoverageException())
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.code").value("POSTCODE_COVERAGE_UNSUPPORTED"))
+                .andExpect(jsonPath("$.message")
+                        .value("This postcode area is not currently supported."))
+                .andExpect(jsonPath("$.correlationId").value("contract-test-123"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("BT1-PRIVATE"))));
+        org.assertj.core.api.Assertions.assertThat(output)
+                .contains("status=422", "code=POSTCODE_COVERAGE_UNSUPPORTED")
+                .doesNotContain("BT1-PRIVATE");
     }
 
     @Test

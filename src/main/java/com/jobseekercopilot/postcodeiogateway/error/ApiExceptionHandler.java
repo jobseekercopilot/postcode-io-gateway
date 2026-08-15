@@ -7,6 +7,7 @@ import com.jobseekercopilot.postcodeiogateway.client.ProviderResponseException;
 import com.jobseekercopilot.postcodeiogateway.logging.CorrelationIdFilter;
 import com.jobseekercopilot.postcodeiogateway.validation.InvalidPostcodeException;
 import com.jobseekercopilot.postcodeiogateway.validation.InvalidPlaceSearchException;
+import com.jobseekercopilot.postcodeiogateway.validation.UnsupportedPostcodeCoverageException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -31,6 +32,14 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> invalidPostcode(InvalidPostcodeException error, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "INVALID_POSTCODE",
                 "Postcode must be a valid UK postcode or outcode.", error, request);
+    }
+
+    @ExceptionHandler(UnsupportedPostcodeCoverageException.class)
+    ResponseEntity<ApiError> unsupportedPostcodeCoverage(
+            UnsupportedPostcodeCoverageException error,
+            HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_ENTITY, "POSTCODE_COVERAGE_UNSUPPORTED",
+                "This postcode area is not currently supported.", error, request);
     }
 
     @ExceptionHandler(InvalidPlaceSearchException.class)
