@@ -27,6 +27,12 @@ Null, empty, partial, oversized, non-ASCII, or structurally invalid values are
 rejected before any provider call. Validation proves syntax, not that a
 postcode exists; a syntactically valid but unknown postcode receives `404`.
 
+Full postcodes and outcodes whose canonical outward code begins `BT` are also
+subject to the Northern Ireland licensing gate. The checked-in default is
+disabled. While disabled, the gateway rejects the request before cache lookup,
+fixture access or a live provider call; enabling it in production requires an
+explicit reviewed deployment value and the separate licensing approval.
+
 ## Responses
 
 A successful lookup returns `200` and the existing `PostcodeLocation` JSON
@@ -46,6 +52,7 @@ shape. A failure returns JSON with stable `status`, `code`, `message`, and
 |---|---|---|
 | `400` | `INVALID_POSTCODE` | Correct the submitted postcode/outcode before retrying. |
 | `404` | `POSTCODE_NOT_FOUND` | The valid input has no provider result; do not retry unchanged. |
+| `422` | `POSTCODE_COVERAGE_UNSUPPORTED` | The syntactically valid postcode area is outside the currently approved coverage; do not retry unchanged. |
 | `429` | `PROVIDER_RATE_LIMITED` | The provider remained throttled after the gateway's bounded retry policy; retry later. |
 | `502` | `PROVIDER_BAD_RESPONSE` | A transport, decoding, or unusable upstream response ended the lookup; retry according to the caller's budget. |
 | `503` | `PROVIDER_UNAVAILABLE` | The gateway's provider circuit is open; retry later. |

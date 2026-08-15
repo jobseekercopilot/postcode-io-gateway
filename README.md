@@ -32,6 +32,7 @@ provider fan-out. That boundary is defined in the Infrastructure
 | `DEPLOYMENT_ENVIRONMENT_CLASS` | none (required) | `LOCAL`, `TEST`, `DEMO`, `STAGING`, or `PRODUCTION` |
 | `EXTERNAL_PROVIDER_MODE` | none (required) | `LIVE` or `FIXTURE`; must match the environment-class policy |
 | `EXTERNAL_PROVIDER_BASE_URL` | `https://api.postcodes.io` | Trusted LIVE provider origin; override only for an approved local test stub |
+| `POSTCODES_IO_NORTHERN_IRELAND_ENABLED` | `false` | Explicit licensing approval gate for `BT` full postcodes and outcodes; production must keep this false unless the separate NI data approval is complete |
 | `PROVIDER_CONNECT_TIMEOUT` / `PROVIDER_RESPONSE_TIMEOUT` / `PROVIDER_TOTAL_TIMEOUT` | `500ms` / `1s` / `4s` | Per-connect, per-attempt and hard logical-call deadlines |
 | `PROVIDER_MAX_RETRIES` / `PROVIDER_INITIAL_BACKOFF` / `PROVIDER_MAX_BACKOFF` / `PROVIDER_RETRY_JITTER` | `2` / `100ms` / `500ms` / `0.5` | Bounded transient-failure retry policy |
 | `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` / `PROVIDER_CIRCUIT_OPEN_DURATION` | `5` / `30s` | Consecutive logical failures before open and half-open delay |
@@ -88,8 +89,10 @@ failure set, request budget, metrics, alert starting points, ownership and
 residual risks.
 
 Requests accept syntactically valid UK full postcodes and outcodes, canonicalise
-them before provider access, and expose stable redacted `400`, `404`, `429`,
-`502`, `503`, and `504` error responses. See the
+them before provider access, and expose stable redacted `400`, `404`, `422`,
+`429`, `502`, `503`, and `504` error responses. `BT` inputs fail before cache or
+provider access unless Northern Ireland coverage has been explicitly licensed
+and enabled. See the
 [public postcode API contract](docs/POSTCODE_API_CONTRACT.md) for accepted
 forms, error codes, correlation-ID rules, and consumer ownership.
 

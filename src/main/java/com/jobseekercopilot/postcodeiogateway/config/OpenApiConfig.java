@@ -14,6 +14,6 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Jobseeker Copilot - Postcode.io Gateway API")
                         .description("Gateway API for UK postcode lookups via postcodes.io external API.")
-                        .version("1.0.0"));
+                        .version("2.0.0"));
     }
 }
