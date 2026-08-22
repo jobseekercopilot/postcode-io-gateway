@@ -1,5 +1,6 @@
-target/
+target/*
 *.jar
+!target/postcode-io-gateway-1.0.0.jar
 *.class
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

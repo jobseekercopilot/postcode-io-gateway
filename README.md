@@ -1,117 +1,123 @@
-# Postcode IO Gateway
+# Postcode.io Gateway
 
-A Spring Boot gateway service for the UK postcodes.io API, providing location-based functionality for job seeker applications.
+## Role in Job Seeker Copilot
 
-## Features
+| Role | Called by | Calls | Data | Local port |
+|---|---|---|---|---:|
+| Provider boundary for UK place and postcode lookup | Location Service | Postcodes.io in live mode or System Data fixtures | None | 8082 |
 
-- **Postcode Lookup**: Retrieve location data (latitude, longitude, region, etc.) for UK postcodes
-- **Outcode Lookup**: Query postcode outcodes for geographic information
-- **Spring Boot 3.2**: Built on the latest Spring Boot framework with Java 17
-- **WebFlux Support**: Reactive programming model for improved performance
-- **Actuator Endpoints**: Health checks and monitoring capabilities
-- **Docker Ready**: Containerized deployment support
+See the central [location journey](https://docs.jobseekercopilot.com/journeys/location/), [provider integrations](https://docs.jobseekercopilot.com/services/provider-integrations/), and [configuration reference](https://docs.jobseekercopilot.com/operations/configuration/).
 
-## Tech Stack
+Spring Boot boundary for postcode/outcode lookup and bounded place-name search. LIVE mode calls
+`api.postcodes.io`; FIXTURE mode calls system-data-service for deterministic
+test data.
 
-- **Java 17**
-- **Spring Boot 3.2.0**
-- **Spring WebFlux** (reactive web framework)
-- **Spring Boot Actuator** (monitoring)
-- **Lombok** (boilerplate reduction)
-- **Maven** (build tool)
-- **Docker** (containerization)
+> Delivery status: implemented and composed for controlled private-beta use.
+> The fixture client is an in-repository HTTP boundary, live calls are bounded,
+> and the consumed provider contract is monitored. This is not a production
+> availability guarantee.
+> See [the audit](docs/BETA_READINESS_AUDIT.md).
 
-## Project Structure
+Postcode acquisition is an upstream profile concern, not part of Job Search
+provider fan-out. That boundary is defined in the Infrastructure
+[Job Search architecture ADR](https://github.com/jobseekercopilot/infrastructure/blob/develop/docs/adr/0001-job-search-architecture-and-ownership.md).
 
-```
-src/main/java/com/jobseekercopilot/postcodeiogateway/
-├── PostcodeIoGatewayApplication.java  # Application entry point
-├── client/
-│   └── PostcodeIoApiClient.java       # HTTP client for postcodes.io API
-├── controller/
-│   └── PostcodeController.java        # REST API endpoints
-├── model/
-│   └── PostcodeLocation.java          # Data models
-└── service/
-    └── PostcodeService.java           # Business logic layer
+## Requirements and configuration
 
-src/test/java/com/jobseekercopilot/postcodeiogateway/
-├── PostcodeControllerIntegrationTest.java
-└── service/
-    └── PostcodeServiceTest.java
-```
+- Java 17 and Maven 3.9
 
-## Getting Started
+| Variable | Local default | Purpose |
+|---|---|---|
+| `SERVER_PORT` | `8082` | HTTP port |
+| `DEPLOYMENT_ENVIRONMENT_CLASS` | none (required) | `LOCAL`, `TEST`, `DEMO`, `STAGING`, or `PRODUCTION` |
+| `EXTERNAL_PROVIDER_MODE` | none (required) | `LIVE` or `FIXTURE`; must match the environment-class policy |
+| `EXTERNAL_PROVIDER_BASE_URL` | `https://api.postcodes.io` | Trusted LIVE provider origin; override only for an approved local test stub |
+| `POSTCODES_IO_NORTHERN_IRELAND_ENABLED` | `false` | Explicit licensing approval gate for `BT` full postcodes and outcodes; production must keep this false unless the separate NI data approval is complete |
+| `PROVIDER_CONNECT_TIMEOUT` / `PROVIDER_RESPONSE_TIMEOUT` / `PROVIDER_TOTAL_TIMEOUT` | `500ms` / `1s` / `4s` | Per-connect, per-attempt and hard logical-call deadlines |
+| `PROVIDER_MAX_RETRIES` / `PROVIDER_INITIAL_BACKOFF` / `PROVIDER_MAX_BACKOFF` / `PROVIDER_RETRY_JITTER` | `2` / `100ms` / `500ms` / `0.5` | Bounded transient-failure retry policy |
+| `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` / `PROVIDER_CIRCUIT_OPEN_DURATION` | `5` / `30s` | Consecutive logical failures before open and half-open delay |
+| `PROVIDER_SUCCESS_CACHE_TTL` / `PROVIDER_NEGATIVE_CACHE_TTL` / `PROVIDER_CACHE_MAXIMUM_ENTRIES` | `15m` / `1m` / `1000` | Bounded per-instance positive/404 cache |
+| `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` | `health,info` | Actuator web endpoints; expose `metrics` only on an approved operational network |
+| `PROVIDER_MODE_ENDPOINT_ENABLED` | `false` | Opt in to `/internal/provider-mode`; forbidden in `STAGING`/`PRODUCTION` |
+| `SYSTEM_DATA_SERVICE_URL` | `http://localhost:8103` | Fixture dependency |
+| `FIXTURE_DATASET_ID` / `FIXTURE_DATASET_VERSION` / `FIXTURE_SCENARIO` | demo values | Fixture safety metadata exposed by the existing internal mode endpoint |
 
-### Prerequisites
+No provider credential is currently required by postcodes.io. Do not add one
+to source.
 
-- Java 17+
-- Maven 3.8+
-- Docker (optional, for containerized deployment)
+## API, health and build
 
-### Building the Application
-
-```bash
-mvn clean install
-```
-
-### Running the Application
+- `GET /api/postcodes/{postcode}`
+- `GET /api/places?q={place-name}&limit={1..10}` (LIVE mode)
+- `GET /internal/provider-mode` (only when explicitly enabled in a local/test/demo environment)
+- `/v3/api-docs`, `/swagger-ui/index.html`, `/actuator/health`
+- `/actuator/health/readiness` (aggregate application and provider-circuit readiness)
 
 ```bash
-mvn spring-boot:run
+mvn -B clean verify
+./scripts/test-dependency-report-policy.sh
+./scripts/verify-container.sh
+DEPLOYMENT_ENVIRONMENT_CLASS=LOCAL EXTERNAL_PROVIDER_MODE=FIXTURE mvn spring-boot:run
 ```
 
-The application will start on `http://localhost:8080`
+The release-shaped container workflow runs the complete verification before
+building from the verified JAR. The digest-pinned image runs read-only as fixed
+UID/GID `10001:10001`, exposes a redacted readiness check, supports graceful
+shutdown and is scanned for Critical/High OS and library findings in CI. See
+[service operations](docs/OPERATIONS.md) and the
+[observability contract](docs/OBSERVABILITY.md).
 
-### Running with Docker
+CI scans the resolved runtime dependency set with pinned Trivy releases,
+publishes the JSON report, and rejects unaccepted Critical or High findings.
+See [dependency security](docs/DEPENDENCY_SECURITY.md) for local reproduction,
+scanner scope, and the time-bounded exception process.
 
-```bash
-docker build -t postcode-io-gateway .
-docker run -p 8080:8080 postcode-io-gateway
-```
+The build has no local JAR dependency and succeeds from a clean clone. FIXTURE
+mode uses the small HTTP contract documented in
+[`docs/FIXTURE_POSTCODE_CONTRACT.md`](docs/FIXTURE_POSTCODE_CONTRACT.md); do not
+restore generated binaries or create another repository for it.
 
-## API Endpoints
+Startup fails when either environment class or provider mode is missing, blank,
+unknown, or unsafe. See the [provider-mode safety policy](docs/PROVIDER_MODE_SECURITY.md)
+for the allowed matrix, Compose examples, diagnostics restriction, and rollout
+requirements.
 
-### Health Check
-```
-GET /actuator/health
-```
+LIVE lookups have explicit deadlines, safe jittered retries, a circuit breaker,
+separate positive/negative cache TTLs and bounded-cardinality metrics. See the
+[provider resilience policy](docs/PROVIDER_RESILIENCE.md) for the retryable
+failure set, request budget, metrics, alert starting points, ownership and
+residual risks.
 
-### Postcode Lookup
-```
-GET /api/postcodes/{postcode}
-```
-Returns location data for a given UK postcode.
+Requests accept syntactically valid UK full postcodes and outcodes, canonicalise
+them before provider access, and expose stable redacted `400`, `404`, `422`,
+`429`, `502`, `503`, and `504` error responses. `BT` inputs fail before cache or
+provider access unless Northern Ireland coverage has been explicitly licensed
+and enabled. See the
+[public postcode API contract](docs/POSTCODE_API_CONTRACT.md) for accepted
+forms, error codes, correlation-ID rules, and consumer ownership.
 
-### Outcode Lookup
-```
-GET /api/outcodes/{outcode}
-```
-Returns geographic information for a given outcode.
+Place search accepts a restricted 2–80 character name and at most ten results.
+It uses the same LIVE provider deadlines, retry/circuit and safe telemetry as
+postcode lookup. See the [place-search contract](docs/PLACE_SEARCH_CONTRACT.md)
+for fields, privacy, fixture-mode behavior and deterministic testing rules.
 
-## Configuration
+LIVE provider paths are constructed from isolated path segments. The gateway
+accepts additive provider fields but rejects missing or mismatched response
+identity and increments a bounded compatibility-failure metric. See the
+[Postcodes.io compatibility contract](docs/PROVIDER_COMPATIBILITY.md) for the
+reviewed upstream assumptions, fixtures, alert signal, change process, and
+residual risk.
 
-Key configuration properties in `src/main/resources/application.properties`:
+## Branch workflow and troubleshooting
 
-- `server.port`: Application port (default: 8080)
-- Postcodes.io API base URL configuration
+Use `feature/* → develop`; `main` is not used for application delivery. Confirm the active
+provider mode before diagnosing lookups. Production must never use fixture mode
+and tests should not make uncontrolled live calls.
 
-## Testing
+## Licence
 
-Run the test suite:
+Copyright © 2026 Bernard McGeever. All rights reserved.
 
-```bash
-mvn test
-```
-
-## License
-
-This project is part of the Job Seeker Copilot ecosystem.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+This repository contains proprietary software belonging to Bernard McGeever.
+It may not be used, copied, modified or distributed without express written
+permission. See [LICENSE](./LICENSE).

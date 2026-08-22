@@ -1,20 +1,22 @@
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM eclipse-temurin:17-jre-alpine@sha256:02320dd4ce20e243dfb915c686089cf9315c763084fafbb12d5c9993aee18b57
 
 WORKDIR /app
 
-COPY pom.xml .
-COPY src ./src
+RUN apk add --no-cache --upgrade \
+        libexpat=2.8.3-r0 \
+        p11-kit=0.26.2-r0 \
+        p11-kit-trust=0.26.2-r0 \
+    && addgroup -S -g 10001 app \
+    && adduser -S -D -H -u 10001 -G app app
 
-RUN mvn clean package -DskipTests
-
-FROM eclipse-temurin:17-jre-alpine
-
-WORKDIR /app
-
-COPY --from=build /app/target/postcode-io-gateway-1.0.0.jar app.jar
-
-RUN apk add --no-cache curl
+COPY --chown=10001:10001 target/postcode-io-gateway-1.0.0.jar app.jar
+COPY --chown=10001:10001 scripts/container-healthcheck.sh /usr/local/bin/container-healthcheck
 
 EXPOSE 8082
+
+USER 10001:10001
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD ["/usr/local/bin/container-healthcheck"]
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
